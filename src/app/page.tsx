@@ -361,7 +361,7 @@ export default function Home() {
                   const selected = !doNotInclude && numsSplit.includes(num);
                   return unusedPeriods.includes(periodKeys[j]) ? null : <td
                     key={t.name + '-' + c.code + '-' + j}
-                    rowSpan={isExcluded ? 1 : p === 0 || num < 0 ? 2 : 1}
+                    rowSpan={isExcluded || periodSchool ? 1 : p === 0 || num < 0 ? 2 : 1}
                     style={{ ...style, backgroundColor: (
                       (!isExcluded && isMergingClass) ? 'rgb(252, 229, 205)' :
                       p > 0 ? selected ? 'rgb(217, 234, 211)' : (num < 0 ? excludedStyle.backgroundColor : style.backgroundColor) : style.backgroundColor
@@ -499,7 +499,7 @@ export default function Home() {
                       return <Fragment key={"teachertable" + c.code + '-' + t.name}>
                         <tr className={classes.length - 1 === i ? "border-b-2 border-b-slate-400" : ""}>
                           { /* add teacher name row only for first row since we do a row span */ }
-                          {i == 0 ? <td rowSpan={periodSchool ? 1 : 2 * t.classes.length - t.classes.filter(c => excludeCourses.includes(c.code + discriminator + t.name)).length} className="text-center">{t.name}</td> : null}
+                          {i == 0 ? <td rowSpan={periodSchool ? t.classes.length : (2 * t.classes.length - t.classes.filter(c => excludeCourses.includes(c.code + discriminator + t.name)).length)} className="text-center">{t.name}</td> : null}
                       
                           { /* show course code and name, then show exclude checkbox next to name */ }
                           <td rowSpan={rowSpan} className={classname + ' ' + excludedClasses}>{c.code}</td>
@@ -534,13 +534,11 @@ export default function Home() {
                               // get the first (topmost) class
                               for(let i2 = 0; i2 < classes.length; i2++) {
                                 const cl = classes[i2];
-                                // if(cl.periods[j] === 1)
                                 if(!cl || cl.periods[j] === 0 || excludeCourses.includes(cl.code + discriminator + t.name)) continue;
                                 code = cl.code;
                                 break;
                               }
                             }
-                            // console.log(code, thisCourse)
                             if(!code)
                               code = c.code;
                             // hide row if period is unused
@@ -733,7 +731,7 @@ function GetStatus(code: string, name: string) {
     return CourseStatus.NONCREDIT;
   else if(/wo?r?k-?sho?p/i.test(name) || modifiers.includes("ALC") || modifiers.includes("CBI") || modifiers.includes("W") || modifiers.includes("R"))
     return CourseStatus.WORKSHOP;
-  else if(modifiers.includes("V") && modifiers !== "AVD")
+  else if(modifiers.includes("V") && modifiers !== "AVD" && !code.endsWith("AVID"))
     return CourseStatus.VIRTUAL;
   else if(code.startsWith("NSA") || code.startsWith("NSC"))
     return CourseStatus.ASSESSMENT;

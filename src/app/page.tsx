@@ -557,11 +557,15 @@ export default function Home() {
                               {p === 0 ? '' : <div className="flex w-full gap-x-1">
                                 <span className={`underline cursor-pointer`} 
                                 // onclick will set our 'query' to look at students for this class
-                                onClick={() => setQuery(isSelectedForQuery ? undefined : {
-                                code: c.code,
-                                period: periodKeys[j].slice("Period ".length),
-                                teacher: t.name
-                              })}>{p}</span> <input 
+                                onClick={() => {
+                                  if(!isSelectedForQuery)
+                                    setTimeout(() => document.getElementById("student-overview")?.scrollIntoView({ behavior: "smooth" }), 250);
+                                  setQuery(isSelectedForQuery ? undefined : {
+                                    code: c.code,
+                                    period: periodKeys[j].slice("Period ".length),
+                                    teacher: t.name
+                                  });
+                                }}>{p}</span> <input 
                                 className={`${isMergingClass && !isLast ? 'hidden' : ''} ml-auto accent-green-400`}
                                 type="checkbox" 
                                 // disable IF whole course was excluded (tickbox checked)
@@ -729,11 +733,11 @@ function GetStatus(code: string, name: string) {
     return CourseStatus.NONCREDIT;
   else if(/wo?r?k-?sho?p/i.test(name) || modifiers.includes("ALC") || modifiers.includes("CBI") || modifiers.includes("W") || modifiers.includes("R"))
     return CourseStatus.WORKSHOP;
-  else if(modifiers.includes("V"))
+  else if(modifiers.includes("V") && modifiers !== "AVD")
     return CourseStatus.VIRTUAL;
   else if(code.startsWith("NSA") || code.startsWith("NSC"))
     return CourseStatus.ASSESSMENT;
-  else if(lowerName.startsWith("ap") || lowerName.startsWith("advanced placement") || modifiers.endsWith("H") || modifiers.endsWith("G"))
+  else if(lowerName.startsWith("ap ") || lowerName.startsWith("advanced placement") || (modifiers.endsWith("H") && modifiers !== "HTH") || modifiers.endsWith("G"))
     return CourseStatus.HONORS;
 }
 

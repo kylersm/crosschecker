@@ -2,7 +2,7 @@
 
 import ReactDOMServer from "react-dom/server";
 import csv from "papaparse";
-import { Dispatch, PropsWithChildren, SetStateAction, useMemo, useState } from "react";
+import { CSSProperties, Dispatch, Fragment, PropsWithChildren, SetStateAction, useMemo, useState } from "react";
 
 interface TeacherScheduleEntry {
   School: string;
@@ -78,8 +78,8 @@ interface StudentRosterEntry {
 }
 
 interface FinalSample {
-  TL_Name: string;
-  TF_Name: string;
+  T_L_Name: string;
+  T_F_Name: string;
   Period: string;
   Enrollment: string;
   ClassCode: string;
@@ -145,8 +145,7 @@ export default function Home() {
 
   const [disableApHighlight, setDAH] = useState<boolean>(false);
   const [cdcNums, setCDCN] = useState<string>('');
-
-  // const [manualInclude, setMI] = useState<[string, string][]>([]);
+  const numsSplit = cdcNums.split(',').map(x => parseInt(x));
 
   const [query, setQuery] = useState<QueryStudents>();
 
@@ -161,6 +160,7 @@ export default function Home() {
 
   // get list of unused periods based on filtered teachers (so we can hide columns that we aren't using)
   const unusedPeriods = periodKeys.filter((_, i) => periodIndex > -1 ? i !== periodIndex : teachersWithFilters.every(t => t.classes.every(c => c.periods[i] === 0)));
+  const periodSchool = periodKeys.length - unusedPeriods.length === 1;
 
   // now do something similar for students
   const students: Student[] = [];
@@ -222,13 +222,13 @@ export default function Home() {
           if(shouldMerge) {
             // if the user clicks on the 'select all' box, it causes classes you wouldn't normally be able to select to get selected.
             // this checks to see if we're working with the course that appears first that is non-empty.
-            const isFirst = t.classes.every((c2, i2) => i <= i2 || c2.periods[j] === 0);
+            const isFirst = t.classes.every((c2, i2) => i <= i2 || c2.periods[j] === 0 || excludeCourses.includes(c2.code + discriminator + t.name));
             if(!isFirst) return;
             const pdClasses: string[] = [];
             // add all non-empty courses to the list
             for(let i2 = 0; i2 < t.classes.length; i2++) {
               const cl = t.classes[i2];
-              if(!cl || cl.periods[j] === 0) continue;
+              if(!cl || cl.periods[j] === 0 || excludeCourses.includes(cl.code + discriminator + t.name)) continue;
               const thisCode = cl.code + discriminator + t.name + discriminator + periodKeys[j].slice("Period ".length);
               if(excludeCourses.some(e => thisCode.startsWith(e))) return;
               pdClasses.push(thisCode);
@@ -253,7 +253,7 @@ export default function Home() {
 
   // generate the text to be pasted into the spreadsheet
   const unparse = useMemo<FinalSample[]>(() => {
-    const arr: FinalSample[] = Object.entries(classCodeObj).map(([key, code]) => {
+    const arr: FinalSample[] = Object.entries(classCodeObj).filter(([, code]) => numsSplit.includes(code)).map(([key, code]) => {
       // get information from the key
       const destructKey = key.split(discriminator) as [string, string, string];
       const courseCode = destructKey[0];
@@ -263,17 +263,131 @@ export default function Home() {
       const periodIndex = periodKeys.indexOf(("Period " + period) as keyof TeacherScheduleEntry);
 
       return {
-        TL_Name: teacher[0],
-        TF_Name: teacher[1],
+        T_L_Name: teacher[0],
+        T_F_Name: teacher[1],
         Period: period,
         Enrollment: classEntry?.periods[periodIndex].toString() ?? '-1',
         ClassCode: code.toString(),
         CourseName: classEntry?.name ?? "Not found"
       }
-    })
-    
-    return arr.sort((a, b) => a.TL_Name.localeCompare(b.TL_Name));
-  }, [classCodeObj, teachersWithFilters]);
+    }).sort((a, b) => a.T_L_Name.localeCompare(b.T_L_Name));
+
+    return arr.concat(...new Array(Math.max(0, 15 - arr.length)).fill({
+      T_L_Name: '',
+      T_F_Name: '',
+      Period: '',
+      Enrollment: '',
+      ClassCode: '',
+      CourseName: ''
+    }));
+  }, [classCodeObj, teachersWithFilters, numsSplit]);
+
+  const CopySampleButton = <Button onClick={() => 
+    // copy WITH FORMATTING to clipboard with a lot of ease
+    navigator.clipboard.write([new ClipboardItem({
+      // style prop has to be used instead of tailwind classes
+      "text/html": ReactDOMServer.renderToStaticMarkup(<table style={{ fontFamily: "Calibri", fontSize: "12pt" }}>
+        <tbody>
+          <tr style={{ fontFamily: "Times New Roman", fontWeight: "bold" }}>
+            <td>T_L_Name</td>
+            <td>T_F_Name</td>
+            <td style={{ color: "#f00" }}>Period #</td>
+            <td>Enrollment</td>
+            <td>Class Code</td>
+            <td>Class</td>
+          </tr>
+          {unparse.map((row, i) => <tr key={i}>
+            <td>{row.T_L_Name}</td>
+            <td>{row.T_F_Name}</td>
+            <td>{row.Period}</td>
+            <td>{row.Enrollment}</td>
+            <td>{row.ClassCode}</td>
+            <td>{row.CourseName}</td>
+            {
+              i === 0 ?  <><td/><td/><td/><td/><td/><td style={{ fontFamily: "Times New Roman", fontWeight: "bold", color: "#f00" }}>Do not edit the Class</td></> :
+              i === 1 ?  <><td/><td/><td/><td/><td/><td>Look on the school page, if you think the report page is truncated.</td></> :
+              i === 13 ? <><td/><td/><td/><td style={{ fontFamily: "Times New Roman "}}>{unparse.reduce((p, c) => p + (parseInt(c.Enrollment) || 0), 0)}</td><td style={{ fontFamily: "Times New Roman "}}>enrollment</td></> :
+              i === 14 ? <><td/><td/><td/><td>{Math.max(...Object.values(classCodeObj))}</td><td># of classes</td></> : null
+            }
+          </tr>)}
+        </tbody>
+      </table>)
+    })])
+  } className="bg-amber-500">
+    Copy sample
+  </Button>;
+
+  // generate the table for sampling to be pasted into the spreadsheet
+  const excludedStyle: CSSProperties = { backgroundColor: "#ffff00" };
+  const CopyTableButton = <Button onClick={() =>
+    navigator.clipboard.write([new ClipboardItem({
+      // style prop has to be used instead of tailwind classes
+      "text/html": ReactDOMServer.renderToStaticMarkup(<table style={{ fontFamily: "Calibri", fontSize: "12pt" }}>
+        <thead>
+          <th>Course Code</th>
+          <th>Course Name</th>
+          <th>Teacher</th>
+          {periodKeys.filter(x => !unusedPeriods.includes(x)).map(x => <th key={"cpyto"+x}>{x}</th>)}
+        </thead>
+        <tbody>
+          {teachersWithFilters.map(t => t.classes.map((c, i, classes) => {
+            const thisCourse = c.code+discriminator+t.name;
+            const isExcluded = excludeCourses.includes(thisCourse);
+            const style = { ...(isExcluded ? excludedStyle : undefined) };
+            const codeElement = c.periods.map((p,i) => {
+              const includePeriod = includeClasses.includes(c.code + discriminator + t.name + discriminator + (periodKeys[i].slice("Period ".length)));
+              const doNotInclude = p === 0 || !includePeriod;
+              const num = classCodeObj[c.code + discriminator + t.name + discriminator + periodKeys[i].slice("Period ".length)] ?? -1;
+              const selected = !doNotInclude && numsSplit.includes(num);
+              const isMergingClass = isMerging(classes, i, c);
+              if(!unusedPeriods.includes(periodKeys[i])) return num > 0 ? <td 
+                key={"copyclasstable" + c.code + '-' + t.name + '-' + periodKeys[i]}
+                style={{ ...style, color: "#f00", backgroundColor: selected ? 'rgb(217, 234, 211)' : isMergingClass ? 'rgb(252, 229, 205)' : ''}}
+              >
+                {num}
+              </td> : null;
+            });
+            return <Fragment key={"copyteachertable" + c.code + '-' + t.name}>
+              <tr>
+                { /* add teacher name row only for first row since we do a row span */ }
+                <td style={style}>{c.code}</td>
+                <td style={style}>{c.name}</td>
+                <td style={style}>{t.name}</td>
+                {c.periods.map((p,j) => {
+                  const isMergingClass = classes.filter(c2 => c2.periods[j] > 0).length > 1;
+                  const includePeriod = includeClasses.includes(c.code + discriminator + t.name + discriminator + (periodKeys[j].slice("Period ".length)));
+                  const num = classCodeObj[c.code + discriminator + t.name + discriminator + periodKeys[j].slice("Period ".length)] ?? -1;
+                  const doNotInclude = p === 0 || !includePeriod;
+                  const selected = !doNotInclude && numsSplit.includes(num);
+                  return unusedPeriods.includes(periodKeys[j]) ? null : <td
+                    key={t.name + '-' + c.code + '-' + j}
+                    rowSpan={isExcluded ? 1 : p === 0 || num < 0 ? 2 : 1}
+                    style={{ ...style, backgroundColor: (
+                      (!isExcluded && isMergingClass) ? 'rgb(252, 229, 205)' :
+                      p > 0 ? selected ? 'rgb(217, 234, 211)' : (num < 0 ? excludedStyle.backgroundColor : style.backgroundColor) : style.backgroundColor
+                    ) }}
+                  >
+                    {p === 0 ? '' : <div className="flex w-full gap-x-1">
+                      <span>{p}</span>
+                    </div>}
+                  </td>;
+                })}
+                {periodSchool ? codeElement : null}
+              </tr>
+
+              {/* show class code number if selected */}
+              {!periodSchool && !isExcluded ? <tr>
+                <td/><td/><td/>
+                {codeElement}
+              </tr> : null}
+            </Fragment>
+          }))}
+        </tbody>
+      </table>)
+    })])
+  } className="bg-amber-400">
+    Copy table
+  </Button>;
 
   const goToSelected = () => {
     const y = (document.getElementById("queried")?.getBoundingClientRect().top ?? 0) + window.scrollY - 35;
@@ -321,11 +435,11 @@ export default function Home() {
                   <td>Course code ends with...</td>
                   <td><input onChange={e => setCCS(e.target.value)} type="text" className="bg-white rounded-md text-black px-2"/></td>
                   <td>Select all classes (on screen) for sample</td>
-                  <td><input onClick={() => {setECourse([]);setIClass(allClasses);}} className="bg-white text-black rounded-md px-2 border-black" type="button" value={"Click me!"}/></td>
+                  <td><input onClick={() => {setIClass(allClasses);}} className="bg-white text-black rounded-md px-2 border-black" type="button" value={"Click me!"}/></td>
                 </tr>
                 <tr>
-                  <td><b>OR...</b> Course name contains...</td>
-                  <td><input onChange={e => setCNI(e.target.value)} type="text" className="bg-white rounded-md text-black px-2"/></td>
+                  <td className="border-t-2">Course name contains...</td>
+                  <td className="border-t-2"><input onChange={e => setCNI(e.target.value)} type="text" className="bg-white rounded-md text-black px-2"/></td>
                   <td>Unselect all classes for sample</td>
                   <td><input onClick={() => {setECourse([]);setIClass([]);}} className="bg-white text-black rounded-md px-2 border-black" type="button" value={"Click me!"}/></td>
                 </tr>
@@ -341,8 +455,9 @@ export default function Home() {
                 </tr>
               </tbody>
             </table>
+            {/* Show percentage based off of filtered classes */}
             <div className="mx-auto w-full text-center text-2xl">
-              <b>RANGE: </b> {(filteredEnrollment / doeEn).toPrecision(3)}%<br/>
+              <b>RANGE: </b> {((filteredEnrollment / doeEn) * 100).toPrecision(3)}%<br/>
               {Math.abs(1 - (filteredEnrollment / doeEn)) > 0.15 ? <p className="text-red-500 font-bold">Out of 15% range</p> : <p className="text-green-500 font-bold text-lg">In 15% range</p>}
             </div>
             <div className="flex gap-x-5 px-1">
@@ -357,7 +472,8 @@ export default function Home() {
                       <th>Course Code</th>
                       <th>Name</th>
                       {/* Add a table header for each period */}
-                      {periodKeys.filter(x => !unusedPeriods.includes(x)).map(x => <th key={"to"+x}>{x.slice("Period ".length)}</th>)}
+                      {periodKeys.filter(x => !unusedPeriods.includes(x)).map(x => <th key={"to"+x}>{periodSchool ? x : x.slice("Period ".length)}</th>)}
+                      {periodSchool ? <th>Class Code</th> : null}
                     </tr>
                   </thead>
                   <tbody className="border-2">
@@ -366,23 +482,39 @@ export default function Home() {
                       const status = GetStatus(c.code, c.name);
                       const thisCourse = c.code+discriminator+t.name;
                       const excludedClasses = excludeCourses.includes(thisCourse) ? 'italic line-through text-gray-400' : '';
+                      const rowSpan = periodSchool || excludedClasses.length ? 1 : 2;
                       const classname = status ? status + " text-black" : '';
-                      return <>
-                        <tr key={"teachertable" + c.code + '-' + t.name} className={classes.length - 1 === i ? "border-b-2 border-b-slate-400" : ""}>
+                      const codeElement = c.periods.map((p,i) => {
+                        const includePeriod = includeClasses.includes(c.code + discriminator + t.name + discriminator + (periodKeys[i].slice("Period ".length)));
+                        const doNotInclude = p === 0 || !includePeriod;
+                        const num = classCodeObj[c.code + discriminator + t.name + discriminator + periodKeys[i].slice("Period ".length)] ?? -1;
+                        const selected = !doNotInclude && numsSplit.includes(num);
+                        if(!unusedPeriods.includes(periodKeys[i])) return num > 0 ? <td 
+                          key={"classtable" + c.code + '-' + t.name + '-' + periodKeys[i]}
+                          className={`text-center font-normal! h-max ${selected ? 'bg-green-100' : ''} text-red-500`}
+                        >
+                          {num}
+                        </td> : null;
+                      });
+                      return <Fragment key={"teachertable" + c.code + '-' + t.name}>
+                        <tr className={classes.length - 1 === i ? "border-b-2 border-b-slate-400" : ""}>
                           { /* add teacher name row only for first row since we do a row span */ }
-                          {i == 0 ? <td rowSpan={2 * t.classes.length - t.classes.filter(c => excludeCourses.includes(c.code + discriminator + t.name)).length} className="text-center">{t.name}</td> : <></>}
+                          {i == 0 ? <td rowSpan={periodSchool ? 1 : 2 * t.classes.length - t.classes.filter(c => excludeCourses.includes(c.code + discriminator + t.name)).length} className="text-center">{t.name}</td> : null}
                       
                           { /* show course code and name, then show exclude checkbox next to name */ }
-                          <td rowSpan={excludedClasses.length ? 1 : 2} className={classname + ' ' + excludedClasses}>{c.code}</td>
+                          <td rowSpan={rowSpan} className={classname + ' ' + excludedClasses}>{c.code}</td>
                           { /* show course name and exclusion checkbox */ }
-                          <td rowSpan={excludedClasses.length ? 1 : 2} className={classname + ' ' + excludedClasses}>
+                          <td rowSpan={rowSpan} className={classname + ' ' + excludedClasses}>
                             <div className="flex w-full gap-x-1">
-                              {c.name} <input title="Click to exclude entire course from sample" className="ml-auto accent-red-500" type="checkbox" onChange={(e) =>
-                                setECourse(
-                                  e.target.checked ? 
-                                    excludeCourses.concat(thisCourse) :
-                                    excludeCourses.filter(c => c !== thisCourse)
-                                )}/>
+                              {c.name} <input title="Click to exclude entire course from sample" className="ml-auto accent-red-500" type="checkbox" 
+                                checked={excludeCourses.includes(thisCourse)}
+                                onChange={(e) =>
+                                  setECourse(
+                                    e.target.checked ? 
+                                      excludeCourses.concat(thisCourse) :
+                                      excludeCourses.filter(c => c !== thisCourse)
+                                  )}
+                                />
                             </div>  
                           </td>
                           { /* map out periods */ }
@@ -400,20 +532,22 @@ export default function Home() {
                               */
                             if(isMergingClass) {
                               // get the first (topmost) class
-                              for(let i2 = 0; i < classes.length || !code; i2++) {
-                                const cl = t.classes[i2];
-                                if(!cl || cl.periods[j] === 0) continue;
+                              for(let i2 = 0; i2 < classes.length; i2++) {
+                                const cl = classes[i2];
+                                // if(cl.periods[j] === 1)
+                                if(!cl || cl.periods[j] === 0 || excludeCourses.includes(cl.code + discriminator + t.name)) continue;
                                 code = cl.code;
                                 break;
                               }
                             }
+                            // console.log(code, thisCourse)
                             if(!code)
                               code = c.code;
                             // hide row if period is unused
                             // show table data and highlight as amber if we are looking at student info
-                            return unusedPeriods.includes(periodKeys[j]) ? <></> : <td
+                            return unusedPeriods.includes(periodKeys[j]) ? null : <td
                               key={t.name + '-' + c.code + '-' + j}
-                              rowSpan={excludedClasses.length ? 1 : p === 0 || num < 0 ? 2 : 1}
+                              rowSpan={rowSpan === 1 ? 1 : p === 0 || num < 0 ? 2 : 1}
                               id={isSelectedForQuery ? 'queried' : ''}
                               className={
                                 'font-normal! ' + 
@@ -423,7 +557,7 @@ export default function Home() {
                               {p === 0 ? '' : <div className="flex w-full gap-x-1">
                                 <span className={`underline cursor-pointer`} 
                                 // onclick will set our 'query' to look at students for this class
-                                onClick={() => setQuery({
+                                onClick={() => setQuery(isSelectedForQuery ? undefined : {
                                 code: c.code,
                                 period: periodKeys[j].slice("Period ".length),
                                 teacher: t.name
@@ -445,24 +579,13 @@ export default function Home() {
                               </div>}
                             </td>
                           ;})}
+
+                          {periodSchool ? codeElement : null}
                         </tr>
 
-                        
-                        {!excludedClasses.length ? <tr key={"teachertablepreview" + c.code + '-' + t.name}>
-                          {c.periods.map((p,i) => {
-                            const includePeriod = includeClasses.includes(c.code + discriminator + t.name + discriminator + (periodKeys[i].slice("Period ".length)));
-                            const doNotInclude = p === 0 || !includePeriod;
-                            const num = classCodeObj[c.code + discriminator + t.name + discriminator + periodKeys[i].slice("Period ".length)] ?? -1;
-                            const selected = !doNotInclude && cdcNums.split(',').map(c => parseInt(c)).includes(num);
-                            if(!unusedPeriods.includes(periodKeys[i])) return num > 0 ? <td 
-                              key={"previewtableNUM" + c.code + '-' + t.name + '-' + periodKeys[i]}
-                              className={`text-center font-normal! h-max ${selected ? 'bg-green-100' : classname} text-red-500`}
-                            >
-                              {num}
-                            </td> : <></>;
-                          })}
-                        </tr> : <></>}
-                      </>
+                        {/* show class code number if selected */}
+                        {!periodSchool && !excludedClasses.length ? <tr>{codeElement}</tr> : null}
+                      </Fragment>
                     }))}
                   </tbody>
                 </table>
@@ -495,8 +618,8 @@ export default function Home() {
                           appearsInOther ? "Student appears in another class in the classes you filtered for." :
                           isThisClass ? "This is the class you clicked on in filters." : ''
                         }>
-                        {i == 0 ? <td rowSpan={s.schedule.length} className="text-center">{s.ssid}</td> : <></>}
-                        {i == 0 ? <td rowSpan={s.schedule.length} className="text-center">{s.name}</td> : <></>}
+                        {i == 0 ? <td rowSpan={s.schedule.length} className="text-center">{s.ssid}</td> : null}
+                        {i == 0 ? <td rowSpan={s.schedule.length} className="text-center">{s.name}</td> : null}
                         <td className={classname}>{c.code}</td>
                         <td className={classname}>{c.name}</td>
                         <td className={classname}>{c.teacher}</td>
@@ -509,8 +632,7 @@ export default function Home() {
                 </> : ''}
               </div>
               {/* RIGHT SIDE */}
-              <div className="w-fit max-w-[10rem] sticky top-0 self-start">
-                <p className="text-center text-3xl font-semibold">Color Key</p>
+              <div className="w-fit max-w-[10rem] sticky top-0 self-start h-screen overflow-y-scroll">
                 <table className="mx-auto mb-5 info text-sm mt-1">
                   <tbody>
                     <tr><td>Regular class</td></tr>
@@ -531,6 +653,7 @@ export default function Home() {
                       {query.teacher} PD {query.period}<br/>
                       Course {query.code}<br/>
                     </div>
+                    {CopySampleButton}
                     <Button onClick={goToSelected} className="bg-red-200">
                       <div className="flex items-center">
                         <p className="text-xl font-bold -ml-2 mr-2">↑</p>
@@ -545,8 +668,6 @@ export default function Home() {
                       <p>Scroll to student overview</p>
                       </div>
                     </Button>
-
-                    <br className="h-10"/>
                     <i>See student overview before clicking</i>
                     <Button onClick={() => {
                         const thisClass = query.code + discriminator + query.teacher + discriminator + query.period;
@@ -564,13 +685,16 @@ export default function Home() {
                     }} className="bg-green-400">
                       Include Class
                     </Button>
-                  </div> : <i className="mx-auto">No selected class</i>}
+                  </div> : <div className="w-fit mx-auto">
+                    <i className="mx-auto">No selected class</i>
+                    {CopyTableButton}
+                    {CopySampleButton}
+                  </div>}
                 </div>
               </div>
             </div>
           </div>
-          <pre>{csv.unparse(unparse)}</pre>
-        </div> : <></>}
+        </div> : null}
         <pre>
         </pre>
       </div>

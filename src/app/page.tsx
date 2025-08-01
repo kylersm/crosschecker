@@ -427,31 +427,31 @@ export default function Home() {
               <tbody>
                 <tr>
                   <td>Course code begins with...</td>
-                  <td><input onChange={e => setCCP(e.target.value)} type="text" className="bg-white rounded-md text-black px-2"/></td>
-                  <td>Disable <span className="bg-white text-red-500 font-semibold">appears in other class</span> Highlighting</td>
+                  <td><input onChange={e => setCCP(e.target.value)} type="text" className="bg-slate-200 dark:bg-white rounded-md text-black px-2"/></td>
+                  <td>Disable <span className="bg-yellow-300 dark:bg-white text-red-500 font-semibold">appears in other class</span> Highlighting</td>
                   <td><input onChange={e => setDAH(e.target.checked)} type="checkbox"/></td>
                 </tr>
                 <tr>
                   <td>Course code ends with...</td>
-                  <td><input onChange={e => setCCS(e.target.value)} type="text" className="bg-white rounded-md text-black px-2"/></td>
+                  <td><input onChange={e => setCCS(e.target.value)} type="text" className="bg-slate-200 dark:bg-white rounded-md text-black px-2"/></td>
                   <td>Select all classes (on screen) for sample</td>
-                  <td><input onClick={() => {setIClass(allClasses);}} className="bg-white text-black rounded-md px-2 border-black" type="button" value={"Click me!"}/></td>
+                  <td><input onClick={() => {setIClass(allClasses);}} className="bg-slate-200 dark:bg-white text-black rounded-md px-2 border-black" type="button" value={"Click me!"}/></td>
                 </tr>
                 <tr>
                   <td className="border-t-2">Course name contains...</td>
-                  <td className="border-t-2"><input onChange={e => setCNI(e.target.value)} type="text" className="bg-white rounded-md text-black px-2"/></td>
+                  <td className="border-t-2"><input onChange={e => setCNI(e.target.value)} type="text" className="bg-slate-200 dark:bg-white rounded-md text-black px-2"/></td>
                   <td>Unselect all classes for sample</td>
-                  <td><input onClick={() => {setECourse([]);setIClass([]);}} className="bg-white text-black rounded-md px-2 border-black" type="button" value={"Click me!"}/></td>
+                  <td><input onClick={() => {setECourse([]);setIClass([]);}} className="bg-slate-200 dark:bg-white text-black rounded-md px-2 border-black" type="button" value={"Click me!"}/></td>
                 </tr>
                 <tr>
                   <td>Period must be...</td>
-                  <td><input onChange={e => setCPIS(e.target.value)} type="text" className="bg-white rounded-md text-black px-2"/></td>
+                  <td><input onChange={e => setCPIS(e.target.value)} type="text" className="rounded-md text-black px-2"/></td>
                   <td>DOE Enrollment</td>
-                  <td><input onChange={e => setDEN(parseInt(e.target.value))} type="number" min={1} className="bg-white rounded-md text-black px-2"/></td>
+                  <td><input onChange={e => setDEN(parseInt(e.target.value))} type="number" min={1} className="bg-slate-200 dark:bg-white rounded-md text-black px-2"/></td>
                 </tr>
                 <tr>
                   <td>CDC Random Numbers</td>
-                  <td colSpan={3}><input onChange={e => setCDCN(e.target.value)} type="text" className="w-full bg-white rounded-md text-black px-2"/></td>
+                  <td colSpan={3}><input onChange={e => setCDCN(e.target.value)} type="text" className="bg-slate-200 dark:bg-white w-full rounded-md text-black px-2"/></td>
                 </tr>
               </tbody>
             </table>
@@ -467,7 +467,7 @@ export default function Home() {
                 <p className="text-center text-4xl font-semibold">Teacher Overview</p>
                 <table className="mx-auto mb-5 text-sm info w-full">
                   <thead className="sticky top-0">
-                    <tr className="bg-slate-500">
+                    <tr className="dark:bg-slate-500 bg-slate-100">
                       <th>Teacher</th>
                       <th>Course Code</th>
                       <th>Name</th>
@@ -596,7 +596,7 @@ export default function Home() {
                   <p className="text-center text-4xl font-semibold" id="student-overview">Student Overview</p>
                   <table className="mx-auto mb-5 info w-full">
                     <tbody>
-                      <tr className="bg-slate-500">
+                      <tr className="dark:bg-slate-500 bg-slate-100">
                         <th>SSID</th>
                         <th>Student</th>
                         <th>Course Code</th>
@@ -614,7 +614,7 @@ export default function Home() {
                           !isThisClass && c2.code === c.code && t.name === c.teacher
                         )
                       );
-                      const classname = appearsInOther ? "bg-white text-red-500 font-semibold" : (status ? status + " text-black" : '');
+                      const classname = appearsInOther ? "bg-yellow-300 dark:bg-white text-red-500 font-semibold" : (status ? status + " text-black" : '');
                       return <tr key={"studenttable" + c.code + '-' + s.name + '-' + c.period + '-' + c.teacher} title={
                           appearsInOther ? "Student appears in another class in the classes you filtered for." :
                           isThisClass ? "This is the class you clicked on in filters." : ''

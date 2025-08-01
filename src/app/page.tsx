@@ -147,7 +147,7 @@ export default function Home() {
   const [cdcNums, setCDCN] = useState<string>('');
   const numsSplit = cdcNums.split(',').map(x => parseInt(x));
 
-  const [query, setQuery] = useState<QueryStudents>();
+  const [query, setQuery] = useState<QueryStudents[]>();
 
   const teachersWithFilters = teachers
     // first filter teacher classes that begin and end with given phrases, OR include if name includes phrase and (if period school), period matches input
@@ -167,7 +167,7 @@ export default function Home() {
   // used to get a list of students and their schedules for a specific class
   if(query && parsedSR) {
     // get a list of SSIDs of students in the class we are looking for
-    const ssidsInClass = parsedSR.data.filter(student => query.code === student["Course Code"] && query.period === student.Period && query.teacher === student.Teacher).map(s => s.stateID);
+    const ssidsInClass = parsedSR.data.filter(student => query.some(q => q.code === student["Course Code"] && q.period === student.Period && q.teacher === student.Teacher)).map(s => s.stateID);
     // then (sort students alphabetically) using the SSIDs, get each students' schedules.
     for(const student of parsedSR.data.sort((a, b) => a.Student.localeCompare(b.Student))) {
       // ignore if not in list
@@ -521,7 +521,7 @@ export default function Home() {
                           {c.periods.map((p,j) => {
                             const isMergingClass = isMerging(classes, j, c);
                             const isLast = isLastClass(classes, i, j);
-                            const isSelectedForQuery = query?.code === c.code && query.period === periodKeys[j].slice("Period ".length) && query.teacher === t.name;
+                            const isSelectedForQuery = query?.some(q => q.code === c.code && q.period === periodKeys[j].slice("Period ".length) && q.teacher === t.name);
                             const num = classCodeObj[c.code + discriminator + t.name + discriminator + periodKeys[j].slice("Period ".length)] ?? -1;
                             let code: string | undefined = undefined;
                             /**
@@ -558,11 +558,11 @@ export default function Home() {
                                 onClick={() => {
                                   if(!isSelectedForQuery)
                                     setTimeout(() => document.getElementById("student-overview")?.scrollIntoView({ behavior: "smooth" }), 250);
-                                  setQuery(isSelectedForQuery ? undefined : {
+                                  setQuery(isSelectedForQuery ? undefined : t.classes.filter(t2 => t2.periods[j] > 0).map(c => ({
                                     code: c.code,
                                     period: periodKeys[j].slice("Period ".length),
                                     teacher: t.name
-                                  });
+                                  })));
                                 }}>{p}</span> <input 
                                 className={`${isMergingClass && !isLast ? 'hidden' : ''} ml-auto accent-green-400`}
                                 type="checkbox" 
@@ -594,7 +594,6 @@ export default function Home() {
                 {/* STUDENT OVERVIEW */}
                 {query ? <>
                   <p className="text-center text-4xl font-semibold" id="student-overview">Student Overview</p>
-                  <div className="text-center">Looking at {query.teacher} period {query.period} ({query.code})</div>
                   <table className="mx-auto mb-5 info w-full">
                     <tbody>
                       <tr className="bg-slate-500">
@@ -607,7 +606,7 @@ export default function Home() {
                         <th>En</th>
                       </tr>
                       {students.map(s => s.schedule.map((c, i) => {
-                      const isThisClass = query?.code === c.code && query.period === c.period.toString() && query.teacher === c.teacher;
+                      const isThisClass = query?.some(q => q.code === c.code && q.period === c.period.toString() && q.teacher === c.teacher);
                       const status = isThisClass ? 'bg-amber-300' : GetStatus(c.code, c.name);
                       const appearsInOther = !disableApHighlight && periodIndex < 0 && teachersWithFilters.some(t => 
                         t.classes.some(c2 => 
@@ -651,9 +650,11 @@ export default function Home() {
                 <div className="flex w-full">
                   {query ? <div className="w-fit mx-auto">
                     <div className="mx-auto">
-                      <b>Selected class</b><br/>
-                      {query.teacher} PD {query.period}<br/>
-                      Course {query.code}<br/>
+                      <b>Selected class{query.length > 1 ? 'es' : null}</b><br/>
+                      {query.map((q, i) => <Fragment key={'query'+i}>
+                        {i === 0 ? <>{q.teacher} PD {q.period}<br/></> : null}
+                        Course {q.code}<br/>
+                      </Fragment>)}
                     </div>
                     {CopySampleButton}
                     <Button onClick={goToSelected} className="bg-red-200">
@@ -672,17 +673,13 @@ export default function Home() {
                     </Button>
                     <i>See student overview before clicking</i>
                     <Button onClick={() => {
-                        const thisClass = query.code + discriminator + query.teacher + discriminator + query.period;
-                        if(includeClasses.includes(thisClass))
-                          setIClass(includeClasses.filter(i => i !== thisClass));
+                        setIClass(includeClasses.filter(i => !query.map(q => q.code + discriminator + q.teacher + discriminator + q.period).includes(i)));
                         goToSelected();
                     }} className="bg-red-400">
                       Exclude Class
                     </Button>
                     <Button onClick={() => {
-                        const thisClass = query.code + discriminator + query.teacher + discriminator + query.period;
-                        if(!includeClasses.includes(thisClass))
-                          setIClass(includeClasses.concat(thisClass));
+                        setIClass(includeClasses.concat(query.map(q => q.code + discriminator + q.teacher + discriminator + q.period)));
                         goToSelected();
                     }} className="bg-green-400">
                       Include Class

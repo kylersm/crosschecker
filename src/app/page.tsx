@@ -445,7 +445,7 @@ export default function Home() {
                 </tr>
                 <tr>
                   <td>Period must be...</td>
-                  <td><input onChange={e => setCPIS(e.target.value)} type="text" className="rounded-md text-black px-2"/></td>
+                  <td><input onChange={e => setCPIS(e.target.value)} type="text" className="bg-slate-200 dark:bg-white rounded-md text-black px-2"/></td>
                   <td>DOE Enrollment</td>
                   <td><input onChange={e => setDEN(parseInt(e.target.value))} type="number" min={1} className="bg-slate-200 dark:bg-white rounded-md text-black px-2"/></td>
                 </tr>
@@ -458,7 +458,7 @@ export default function Home() {
             {/* Show percentage based off of filtered classes */}
             <div className="mx-auto w-full text-center text-2xl">
               <b>RANGE: </b> {((filteredEnrollment / doeEn) * 100).toPrecision(3)}%<br/>
-              {Math.abs(1 - (filteredEnrollment / doeEn)) > 0.15 ? <p className="text-red-500 font-bold">Out of 15% range</p> : <p className="text-green-500 font-bold text-lg">In 15% range</p>}
+              {Math.abs(1 - (filteredEnrollment / doeEn)) > 0.10 ? <p className="text-red-500 font-bold">Out of 10% range</p> : <p className="text-green-500 font-bold text-lg">In 10% range</p>}
             </div>
             <div className="flex gap-x-5 px-1">
               {/* LEFT SIDE */}
@@ -552,7 +552,7 @@ export default function Home() {
                                 (isSelectedForQuery ? "bg-amber-300 text-black" : `${classname.includes("bg-") ? 'text-blue-600' : 'text-blue-400!'} ${classname}`)}
                             >
                               { /* if period enrollment is 0 show nothing, otherwise show enrollment and checkbox to include class */ }
-                              {p === 0 ? '' : <div className="flex w-full gap-x-1">
+                              {p === 0 ? null : <div className="flex w-full gap-x-1">
                                 <span className={`underline cursor-pointer`} 
                                 // onclick will set our 'query' to look at students for this class
                                 onClick={() => {
@@ -563,7 +563,7 @@ export default function Home() {
                                     period: periodKeys[j].slice("Period ".length),
                                     teacher: t.name
                                   })));
-                                }}>{p}</span> <input 
+                                }}>{p}</span> {(0 < p && p < 10) && <span className="bg-yellow-300 text-red-500">LOW ENR</span>}<input 
                                 className={`${isMergingClass && !isLast ? 'hidden' : ''} ml-auto accent-green-400`}
                                 type="checkbox" 
                                 // disable IF whole course was excluded (tickbox checked)

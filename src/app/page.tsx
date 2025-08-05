@@ -563,7 +563,7 @@ export default function Home() {
                                     period: periodKeys[j].slice("Period ".length),
                                     teacher: t.name
                                   })));
-                                }}>{p}</span> {(0 < p && p < 10) && <span className="bg-yellow-300 text-red-500">LOW ENR</span>}<input 
+                                }}>{p}</span> {(0 < p && p < 10) && <span className="bg-yellow-300 text-red-500">{'☹'}</span>}<input 
                                 className={`${isMergingClass && !isLast ? 'hidden' : ''} ml-auto accent-green-400`}
                                 type="checkbox" 
                                 // disable IF whole course was excluded (tickbox checked)

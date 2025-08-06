@@ -282,110 +282,112 @@ export default function Home() {
     }));
   }, [classCodeObj, teachersWithFilters, numsSplit]);
 
-  const CopySampleButton = <Button onClick={() => 
+  const CopySampleButton = <Button onClick={() => {
+    const content = ReactDOMServer.renderToStaticMarkup(<table style={{ fontFamily: "Calibri", fontSize: "12pt" }}>
+      <tbody>
+        <tr style={{ fontFamily: "Times New Roman", fontWeight: "bold" }}>
+          <td>T_L_Name</td>
+          <td>T_F_Name</td>
+          <td style={{ color: "#f00" }}>Period #</td>
+          <td>Enrollment</td>
+          <td>Class Code</td>
+          <td>Class</td>
+        </tr>
+        {unparse.map((row, i) => <tr key={i}>
+          <td>{row.T_L_Name}</td>
+          <td>{row.T_F_Name}</td>
+          <td>{row.Period}</td>
+          <td>{row.Enrollment}</td>
+          <td>{row.ClassCode}</td>
+          <td>{row.CourseName}</td>
+          {
+            i === 0 ?  <><td/><td/><td/><td/><td/><td style={{ fontFamily: "Times New Roman", fontWeight: "bold", color: "#f00" }}>Do not edit the Class</td></> :
+            i === 1 ?  <><td/><td/><td/><td/><td/><td>Look on the school page, if you think the report page is truncated.</td></> :
+            i === 13 ? <><td/><td/><td/><td style={{ fontFamily: "Times New Roman "}}>{unparse.reduce((p, c) => p + (parseInt(c.Enrollment) || 0), 0)}</td><td style={{ fontFamily: "Times New Roman "}}>enrollment</td></> :
+            i === 14 ? <><td/><td/><td/><td>{Math.max(...Object.values(classCodeObj))}</td><td># of classes</td></> : null
+          }
+        </tr>)}
+      </tbody>
+    </table>);
     // copy WITH FORMATTING to clipboard with a lot of ease
     navigator.clipboard.write([new ClipboardItem({
       // style prop has to be used instead of tailwind classes
-      "text/html": ReactDOMServer.renderToStaticMarkup(<table style={{ fontFamily: "Calibri", fontSize: "12pt" }}>
-        <tbody>
-          <tr style={{ fontFamily: "Times New Roman", fontWeight: "bold" }}>
-            <td>T_L_Name</td>
-            <td>T_F_Name</td>
-            <td style={{ color: "#f00" }}>Period #</td>
-            <td>Enrollment</td>
-            <td>Class Code</td>
-            <td>Class</td>
-          </tr>
-          {unparse.map((row, i) => <tr key={i}>
-            <td>{row.T_L_Name}</td>
-            <td>{row.T_F_Name}</td>
-            <td>{row.Period}</td>
-            <td>{row.Enrollment}</td>
-            <td>{row.ClassCode}</td>
-            <td>{row.CourseName}</td>
-            {
-              i === 0 ?  <><td/><td/><td/><td/><td/><td style={{ fontFamily: "Times New Roman", fontWeight: "bold", color: "#f00" }}>Do not edit the Class</td></> :
-              i === 1 ?  <><td/><td/><td/><td/><td/><td>Look on the school page, if you think the report page is truncated.</td></> :
-              i === 13 ? <><td/><td/><td/><td style={{ fontFamily: "Times New Roman "}}>{unparse.reduce((p, c) => p + (parseInt(c.Enrollment) || 0), 0)}</td><td style={{ fontFamily: "Times New Roman "}}>enrollment</td></> :
-              i === 14 ? <><td/><td/><td/><td>{Math.max(...Object.values(classCodeObj))}</td><td># of classes</td></> : null
-            }
-          </tr>)}
-        </tbody>
-      </table>)
+      "text/html":  new Blob([content], { type: "text/html" })
     })])
-  } className="bg-amber-500">
+  }} className="bg-amber-500">
     Copy sample
   </Button>;
 
   // generate the table for sampling to be pasted into the spreadsheet
   const excludedStyle: CSSProperties = { backgroundColor: "#ffff00" };
-  const CopyTableButton = <Button onClick={() =>
+  const CopyTableButton = <Button onClick={() => {
+    const content = ReactDOMServer.renderToStaticMarkup(<table style={{ fontFamily: "Calibri", fontSize: "12pt" }}>
+      <thead>
+        <th>Course Code</th>
+        <th>Course Name</th>
+        <th>Teacher</th>
+        {periodKeys.filter(x => !unusedPeriods.includes(x)).map(x => <th key={"cpyto"+x}>{x}</th>)}
+      </thead>
+      <tbody>
+        {teachersWithFilters.map(t => t.classes.map((c, i, classes) => {
+          const thisCourse = c.code+discriminator+t.name;
+          const isExcluded = excludeCourses.includes(thisCourse);
+          const style = { ...(isExcluded ? excludedStyle : undefined) };
+          const codeElement = c.periods.map((p,i) => {
+            const includePeriod = includeClasses.includes(c.code + discriminator + t.name + discriminator + (periodKeys[i].slice("Period ".length)));
+            const doNotInclude = p === 0 || !includePeriod;
+            const num = classCodeObj[c.code + discriminator + t.name + discriminator + periodKeys[i].slice("Period ".length)] ?? -1;
+            const selected = !doNotInclude && numsSplit.includes(num);
+            const isMergingClass = isMerging(classes, i, c);
+            if(!unusedPeriods.includes(periodKeys[i])) return num > 0 ? <td 
+              key={"copyclasstable" + c.code + '-' + t.name + '-' + periodKeys[i]}
+              style={{ ...style, color: "#f00", backgroundColor: selected ? 'rgb(217, 234, 211)' : isMergingClass ? 'rgb(252, 229, 205)' : ''}}
+            >
+              {num}
+            </td> : null;
+          });
+          return <Fragment key={"copyteachertable" + c.code + '-' + t.name}>
+            <tr>
+              { /* add teacher name row only for first row since we do a row span */ }
+              <td style={style}>{c.code}</td>
+              <td style={style}>{c.name}</td>
+              <td style={style}>{t.name}</td>
+              {c.periods.map((p,j) => {
+                const isMergingClass = classes.filter(c2 => c2.periods[j] > 0).length > 1;
+                const includePeriod = includeClasses.includes(c.code + discriminator + t.name + discriminator + (periodKeys[j].slice("Period ".length)));
+                const num = classCodeObj[c.code + discriminator + t.name + discriminator + periodKeys[j].slice("Period ".length)] ?? -1;
+                const doNotInclude = p === 0 || !includePeriod;
+                const selected = !doNotInclude && numsSplit.includes(num);
+                return unusedPeriods.includes(periodKeys[j]) ? null : <td
+                  key={t.name + '-' + c.code + '-' + j}
+                  rowSpan={isExcluded || periodSchool ? 1 : p === 0 || num < 0 ? 2 : 1}
+                  style={{ ...style, backgroundColor: (
+                    (!isExcluded && isMergingClass) ? 'rgb(252, 229, 205)' :
+                    p > 0 ? selected ? 'rgb(217, 234, 211)' : (num < 0 ? excludedStyle.backgroundColor : style.backgroundColor) : style.backgroundColor
+                  ) }}
+                >
+                  {p === 0 ? '' : <div className="flex w-full gap-x-1">
+                    <span>{p}</span>
+                  </div>}
+                </td>;
+              })}
+              {periodSchool ? codeElement : null}
+            </tr>
+
+            {/* show class code number if selected */}
+            {!periodSchool && !isExcluded ? <tr>
+              <td/><td/><td/>
+              {codeElement}
+            </tr> : null}
+          </Fragment>
+        }))}
+      </tbody>
+    </table>);
     navigator.clipboard.write([new ClipboardItem({
       // style prop has to be used instead of tailwind classes
-      "text/html": ReactDOMServer.renderToStaticMarkup(<table style={{ fontFamily: "Calibri", fontSize: "12pt" }}>
-        <thead>
-          <th>Course Code</th>
-          <th>Course Name</th>
-          <th>Teacher</th>
-          {periodKeys.filter(x => !unusedPeriods.includes(x)).map(x => <th key={"cpyto"+x}>{x}</th>)}
-        </thead>
-        <tbody>
-          {teachersWithFilters.map(t => t.classes.map((c, i, classes) => {
-            const thisCourse = c.code+discriminator+t.name;
-            const isExcluded = excludeCourses.includes(thisCourse);
-            const style = { ...(isExcluded ? excludedStyle : undefined) };
-            const codeElement = c.periods.map((p,i) => {
-              const includePeriod = includeClasses.includes(c.code + discriminator + t.name + discriminator + (periodKeys[i].slice("Period ".length)));
-              const doNotInclude = p === 0 || !includePeriod;
-              const num = classCodeObj[c.code + discriminator + t.name + discriminator + periodKeys[i].slice("Period ".length)] ?? -1;
-              const selected = !doNotInclude && numsSplit.includes(num);
-              const isMergingClass = isMerging(classes, i, c);
-              if(!unusedPeriods.includes(periodKeys[i])) return num > 0 ? <td 
-                key={"copyclasstable" + c.code + '-' + t.name + '-' + periodKeys[i]}
-                style={{ ...style, color: "#f00", backgroundColor: selected ? 'rgb(217, 234, 211)' : isMergingClass ? 'rgb(252, 229, 205)' : ''}}
-              >
-                {num}
-              </td> : null;
-            });
-            return <Fragment key={"copyteachertable" + c.code + '-' + t.name}>
-              <tr>
-                { /* add teacher name row only for first row since we do a row span */ }
-                <td style={style}>{c.code}</td>
-                <td style={style}>{c.name}</td>
-                <td style={style}>{t.name}</td>
-                {c.periods.map((p,j) => {
-                  const isMergingClass = classes.filter(c2 => c2.periods[j] > 0).length > 1;
-                  const includePeriod = includeClasses.includes(c.code + discriminator + t.name + discriminator + (periodKeys[j].slice("Period ".length)));
-                  const num = classCodeObj[c.code + discriminator + t.name + discriminator + periodKeys[j].slice("Period ".length)] ?? -1;
-                  const doNotInclude = p === 0 || !includePeriod;
-                  const selected = !doNotInclude && numsSplit.includes(num);
-                  return unusedPeriods.includes(periodKeys[j]) ? null : <td
-                    key={t.name + '-' + c.code + '-' + j}
-                    rowSpan={isExcluded || periodSchool ? 1 : p === 0 || num < 0 ? 2 : 1}
-                    style={{ ...style, backgroundColor: (
-                      (!isExcluded && isMergingClass) ? 'rgb(252, 229, 205)' :
-                      p > 0 ? selected ? 'rgb(217, 234, 211)' : (num < 0 ? excludedStyle.backgroundColor : style.backgroundColor) : style.backgroundColor
-                    ) }}
-                  >
-                    {p === 0 ? '' : <div className="flex w-full gap-x-1">
-                      <span>{p}</span>
-                    </div>}
-                  </td>;
-                })}
-                {periodSchool ? codeElement : null}
-              </tr>
-
-              {/* show class code number if selected */}
-              {!periodSchool && !isExcluded ? <tr>
-                <td/><td/><td/>
-                {codeElement}
-              </tr> : null}
-            </Fragment>
-          }))}
-        </tbody>
-      </table>)
+      "text/html": new Blob([content], { type: "text/html" })
     })])
-  } className="bg-amber-400">
+  }} className="bg-amber-400">
     Copy table
   </Button>;
 

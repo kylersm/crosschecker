@@ -487,9 +487,8 @@ export default function Home() {
                       const rowSpan = periodSchool || excludedClasses.length ? 1 : 2;
                       const classname = status ? status + " text-black" : '';
                       const codeElement = c.periods.map((p,i) => {
-                        const includePeriod = includeClasses.includes(c.code + discriminator + t.name + discriminator + (periodKeys[i].slice("Period ".length)));
-                        const doNotInclude = p === 0 || !includePeriod;
                         const num = classCodeObj[c.code + discriminator + t.name + discriminator + periodKeys[i].slice("Period ".length)] ?? -1;
+                        const doNotInclude = p === 0 || num <= 0;
                         const selected = !doNotInclude && numsSplit.includes(num);
                         if(!unusedPeriods.includes(periodKeys[i])) return num > 0 ? <td 
                           key={"classtable" + c.code + '-' + t.name + '-' + periodKeys[i]}

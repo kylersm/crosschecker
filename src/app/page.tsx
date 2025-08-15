@@ -3,88 +3,11 @@
 import ReactDOMServer from "react-dom/server";
 import csv from "papaparse";
 import { CSSProperties, Dispatch, Fragment, PropsWithChildren, SetStateAction, useMemo, useState } from "react";
-
-interface TeacherScheduleEntry {
-  School: string;
-  Schoolname: string;
-  "Course Code": string;
-  "Course Name": string;
-  Teacher: string;
-  "Period 1": string;
-  "Period 2": string;
-  "Period 3": string;
-  "Period 4": string;
-  "Period 5": string;
-  "Period 6": string;
-  "Period 7": string;
-  "Period 8": string;
-  "Period 9": string;
-  "Period 10": string;
-  "Period 11": string;
-  "Period 12": string;
-  "Period 13": string;
-  "Period 19": string;
-  "Period 20": string;
-  "Grand Total": string;
-}
+import { FinalSample, QueryStudents, Student, StudentRosterEntry, Teacher, TeacherClass, TeacherScheduleEntry } from "@/lib/types";
 
 const periodKeys: (keyof TeacherScheduleEntry)[] = [
   "Period 1", "Period 2", "Period 3", "Period 4", "Period 5", "Period 6", "Period 7", "Period 8", "Period 9", "Period 10", "Period 11", "Period 12", "Period 13", "Period 19", "Period 20"
 ];
-
-interface TeacherClass {
-  name: string;
-  code: string;
-  periods: number[];
-}
-
-interface Teacher {
-  name: string;
-  classes: TeacherClass[];
-}
-
-interface Student {
-  name: string;
-  ssid: string;
-  schedule: StudentClass[];
-}
-
-interface StudentClass {
-  name: string;
-  teacher: string;
-  code: string;
-  period: number;
-  enrollment: number;
-}
-
-interface QueryStudents {
-  code: string;
-  teacher: string;
-  period: string;
-}
-
-interface StudentRosterEntry {
-  stateID: string;
-  Student: string;
-  School: string;
-  Schoolname: string;
-  "Course Code": string;
-  "Course Name": string;
-  Semester: string;
-  Term: string;
-  Day: string;
-  Period: string;
-  Teacher: string;
-}
-
-interface FinalSample {
-  T_L_Name: string;
-  T_F_Name: string;
-  Period: string;
-  Enrollment: string;
-  ClassCode: string;
-  CourseName: string;
-}
 
 const discriminator = 'あ';
 
@@ -593,45 +516,79 @@ export default function Home() {
                   </tbody>
                 </table>
                 {/* STUDENT OVERVIEW */}
-                {query ? <>
-                  <p className="text-center text-4xl font-semibold" id="student-overview">Student Overview</p>
-                  <table className="mx-auto mb-5 info w-full">
-                    <tbody>
-                      <tr className="dark:bg-slate-500 bg-slate-100">
-                        <th>SSID</th>
-                        <th>Student</th>
-                        <th>Course Code</th>
-                        <th>Course Name</th>
-                        <th>Teacher</th>
-                        <th>Pd</th>
-                        <th>En</th>
-                      </tr>
-                      {students.map(s => s.schedule.map((c, i) => {
-                      const isThisClass = query?.some(q => q.code === c.code && q.period === c.period.toString() && q.teacher === c.teacher);
-                      const status = isThisClass ? 'bg-amber-300' : GetStatus(c.code, c.name);
-                      const appearsInOther = !disableApHighlight && periodIndex < 0 && teachersWithFilters.some(t => 
-                        t.classes.some(c2 => 
-                          // c2.code !== query.code && t.name !== query.teacher &&
-                          !isThisClass && c2.code === c.code && t.name === c.teacher
-                        )
-                      );
-                      const classname = appearsInOther ? "bg-yellow-300 dark:bg-white text-red-500 font-semibold" : (status ? status + " text-black" : '');
-                      return <tr key={"studenttable" + c.code + '-' + s.name + '-' + c.period + '-' + c.teacher} title={
-                          appearsInOther ? "Student appears in another class in the classes you filtered for." :
-                          isThisClass ? "This is the class you clicked on in filters." : ''
-                        }>
-                        {i == 0 ? <td rowSpan={s.schedule.length} className="text-center">{s.ssid}</td> : null}
-                        {i == 0 ? <td rowSpan={s.schedule.length} className="text-center">{s.name}</td> : null}
-                        <td className={classname}>{c.code}</td>
-                        <td className={classname}>{c.name}</td>
-                        <td className={classname}>{c.teacher}</td>
-                        <td className={classname + " text-center"}>{c.period}</td>
-                        <td className={classname + " text-center"}>{c.enrollment}</td>
-                      </tr>;
-                    }))}
-                    </tbody>
-                  </table>
-                </> : ''}
+                {query ? <div>
+                  <div className="text-center text-4xl font-semibold pb-2 sticky top-0 bg-background w-full" id="student-overview">
+                    Student Overview
+                    <div className="mx-auto text-base font-normal">
+                      <b>Selected class{query.length > 1 ? 'es' : null}</b><br/>
+                      {query.map((q, i) => <Fragment key={'query'+i}>
+                        {i === 0 ? <>{q.teacher} PD {q.period}<br/></> : null}
+                        Course {q.code}<br/>
+                      </Fragment>)}
+                    </div>
+                  </div>
+                  <div>
+                    <table className="mx-auto mb-5 info w-full">
+                      <thead className="sticky top-12">
+                        <tr className="dark:bg-slate-500 bg-slate-100">
+                          <th>SSID</th>
+                          <th>Student</th>
+                          <th>Course Code</th>
+                          <th>Course Name</th>
+                          <th>Teacher</th>
+                          <th>Pd</th>
+                          <th>En</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {students.map(s => s.schedule.map((c, i) => {
+                        const isThisClass = query?.some(q => q.code === c.code && q.period === c.period.toString() && q.teacher === c.teacher);
+                        const status = isThisClass ? 'bg-amber-300' : GetStatus(c.code, c.name);
+                        const appearsInOther = !disableApHighlight && periodIndex < 0 && teachersWithFilters.some(t => 
+                          t.classes.some(c2 => 
+                            // c2.code !== query.code && t.name !== query.teacher &&
+                            !isThisClass && c2.code === c.code && t.name === c.teacher
+                          )
+                        );
+                        const classname = appearsInOther ? "bg-yellow-300 dark:bg-white text-red-500 font-semibold" : (status ? status + " text-black" : '');
+                        return <tr key={"studenttable" + c.code + '-' + s.name + '-' + c.period + '-' + c.teacher} title={
+                            appearsInOther ? "Student appears in another class in the classes you filtered for." :
+                            isThisClass ? "This is the class you clicked on in filters." : ''
+                          }>
+                          {i == 0 ? <td rowSpan={s.schedule.length} className="text-center">{s.ssid}</td> : null}
+                          {i == 0 ? <td rowSpan={s.schedule.length} className="text-center">{s.name}</td> : null}
+                          <td className={classname}>{c.code}</td>
+                          <td className={classname}>{c.name}</td>
+                          <td className={classname}>{c.teacher}</td>
+                          <td className={classname + " text-center"}>{c.period}</td>
+                          <td className={classname + " text-center"}>{c.enrollment}</td>
+                        </tr>;
+                      }))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* STICKY BOTTOM */}
+                  <div className="sticky bottom-0 w-full bg-background shadow-black shadow-2xl py-2 px-2">
+                    <i>See student overview before clicking</i>
+                    <div className="flex gap-x-2">
+                      <Button onClick={() => {
+                        setIClass(includeClasses.filter(i => !query.map(q => q.code + discriminator + q.teacher + discriminator + q.period).includes(i)));
+                        goToSelected();
+                      }} className="bg-red-400">
+                        Exclude Class
+                      </Button>
+                      <Button onClick={() => {
+                        setIClass(includeClasses.concat(query.map(q => q.code + discriminator + q.teacher + discriminator + q.period)));
+                        goToSelected();
+                      }} className="bg-green-400">
+                        Include Class
+                      </Button>
+                      <div className="border-r-2 mx-4"/>
+                      {CopyTableButton}
+                      {CopySampleButton}
+                    </div>
+                  </div>
+                </div> : null}
               </div>
               {/* RIGHT SIDE */}
               <div className="w-fit max-w-[10rem] sticky top-0 self-start h-screen overflow-y-scroll">
@@ -648,49 +605,6 @@ export default function Home() {
                     <tr><td className={CourseStatus.NONCREDIT + " text-black"}>Noncredit</td></tr>
                   </tbody>
                 </table>
-                <div className="flex w-full">
-                  {query ? <div className="w-fit mx-auto">
-                    <div className="mx-auto">
-                      <b>Selected class{query.length > 1 ? 'es' : null}</b><br/>
-                      {query.map((q, i) => <Fragment key={'query'+i}>
-                        {i === 0 ? <>{q.teacher} PD {q.period}<br/></> : null}
-                        Course {q.code}<br/>
-                      </Fragment>)}
-                    </div>
-                    {CopySampleButton}
-                    <Button onClick={goToSelected} className="bg-red-200">
-                      <div className="flex items-center">
-                        <p className="text-xl font-bold -ml-2 mr-2">↑</p>
-                        <p>Scroll to teacher schedules</p>
-                      </div>
-                    </Button>
-                    <Button onClick={() => 
-                      document.getElementById("student-overview")?.scrollIntoView({ behavior: "smooth" })
-                    } className="bg-amber-200">
-                      <div className="flex items-center">
-                      <p className="text-xl font-bold -ml-2 mr-1">↓</p>
-                      <p>Scroll to student overview</p>
-                      </div>
-                    </Button>
-                    <i>See student overview before clicking</i>
-                    <Button onClick={() => {
-                        setIClass(includeClasses.filter(i => !query.map(q => q.code + discriminator + q.teacher + discriminator + q.period).includes(i)));
-                        goToSelected();
-                    }} className="bg-red-400">
-                      Exclude Class
-                    </Button>
-                    <Button onClick={() => {
-                        setIClass(includeClasses.concat(query.map(q => q.code + discriminator + q.teacher + discriminator + q.period)));
-                        goToSelected();
-                    }} className="bg-green-400">
-                      Include Class
-                    </Button>
-                  </div> : <div className="w-fit mx-auto">
-                    <i className="mx-auto">No selected class</i>
-                    {CopyTableButton}
-                    {CopySampleButton}
-                  </div>}
-                </div>
               </div>
             </div>
           </div>

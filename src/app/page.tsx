@@ -3,9 +3,10 @@
 import ReactDOMServer from "react-dom/server";
 import csv from "papaparse";
 import { CSSProperties, Fragment, useMemo, useState } from "react";
-import { FinalSample, QueryStudents, Student, StudentRosterEntry, Teacher, TeacherClass, TeacherScheduleEntry } from "@/lib/types";
+import { FinalSample, QueryStudents, Student, StudentRosterEntry, Teacher, TeacherScheduleEntry } from "@/lib/types";
 import { Button } from "@/components/Button";
 import { Textarea } from "../components/Textarea";
+import { isMerging, GetStatus, isLastClass, splitInput } from "@/lib/util";
 
 const periodKeys: (keyof TeacherScheduleEntry)[] = [
   "Period 1", "Period 2", "Period 3", "Period 4", "Period 5", "Period 6", "Period 7", "Period 8", "Period 9", "Period 10", "Period 11", "Period 12", "Period 13", "Period 19", "Period 20"
@@ -66,7 +67,7 @@ export default function Home() {
   const [cnInc, setCNI] = useState<string>(''); // Course Name INCludes
   const [cPIs, setCPIS] = useState<string>(''); // Course Period is...
   const [doeEn, setDEN] = useState<number>(0);
-  const periodIndex = periodKeys.indexOf(("Period " + cPIs) as keyof TeacherScheduleEntry);
+  // const periodIndex = periodKeys.indexOf(("Period " + cPIs) as keyof TeacherScheduleEntry);
 
   const [disableApHighlight, setDAH] = useState<boolean>(false);
   const [cdcNums, setCDCN] = useState<string>('');
@@ -74,17 +75,41 @@ export default function Home() {
 
   const [query, setQuery] = useState<QueryStudents[]>();
 
+
+  const inputSeparator = ';';
+  const prefixes = splitInput(ccPre, inputSeparator);
+  const suffixes = splitInput(ccSuf, inputSeparator);
+  const includes = splitInput(cnInc, inputSeparator);
+  const periods  = splitInput(cPIs, inputSeparator)
+                    .map(k => periodKeys.indexOf(("Period " + k) as keyof TeacherScheduleEntry))
+                    .filter(k => k > -1);
+
   const teachersWithFilters = teachers
     // first filter teacher classes that begin and end with given phrases, OR include if name includes phrase and (if period school), period matches input
-    .map(t => ({ ...t, classes: t.classes.filter(c => (!ccPre.length && !ccSuf.length && !cnInc.length && periodIndex < 0) ||
-      ((ccPre.length || ccSuf.length) && c.code.startsWith(ccPre.toUpperCase()) && c.code.endsWith(ccSuf.toUpperCase())) || 
-      ((periodIndex >= 0 || cnInc.length) && c.name.includes(cnInc.toUpperCase()) && (periodIndex < 0 || c.periods[periodIndex] > 0))
-    ).map(c => ({...c, periods: periodIndex < 0 ? c.periods : c.periods.map((e, i) => i === periodIndex ? e : 0)}))}))
+    .map(t => ({ ...t, classes: t.classes.filter(c => {
+      if(prefixes.length || suffixes.length || includes.length || periods.length) {
+
+        if(prefixes.length || suffixes.length)
+          if (
+            prefixes.some(p => c.code.toUpperCase().startsWith(p.toUpperCase())) ||
+            suffixes.some(s => c.code.toUpperCase().endsWith(s.toUpperCase()))
+          )
+            return true;
+        if(periods.length || includes.length)
+          if (
+            periods.some(index => c.periods[index] > 0) ||
+            includes.some(i => c.name.toUpperCase().includes(i.toUpperCase()))
+          )
+            return true;
+
+        return false;
+      } else return true;
+    }).map(c => ({...c, periods: !periods.length ? c.periods : c.periods.map((e, i) => periods.includes(i) ? e : 0)}))}))
     // then remove teachers that aren't teaching any classes that meet criteria
     .filter(t => t.classes.length);
 
   // get list of unused periods based on filtered teachers (so we can hide columns that we aren't using)
-  const unusedPeriods = periodKeys.filter((_, i) => periodIndex > -1 ? i !== periodIndex : teachersWithFilters.every(t => t.classes.every(c => c.periods[i] === 0)));
+  const unusedPeriods = periodKeys.filter((_, i) => periods.length ? !periods.includes(i) : teachersWithFilters.every(t => t.classes.every(c => c.periods[i] === 0)));
   const periodSchool = periodKeys.length - unusedPeriods.length === 1;
 
   // now do something similar for students
@@ -546,7 +571,7 @@ export default function Home() {
                         {students.map(s => s.schedule.map((c, i) => {
                         const isThisClass = query?.some(q => q.code === c.code && q.period === c.period.toString() && q.teacher === c.teacher);
                         const status = isThisClass ? 'bg-amber-300' : GetStatus(c.code, c.name);
-                        const appearsInOther = !disableApHighlight && periodIndex < 0 && teachersWithFilters.some(t => 
+                        const appearsInOther = !disableApHighlight && !periods.length && teachersWithFilters.some(t => 
                           t.classes.some(c2 => 
                             // c2.code !== query.code && t.name !== query.teacher &&
                             !isThisClass && c2.code === c.code && t.name === c.teacher
@@ -618,7 +643,7 @@ export default function Home() {
   );
 }
 
-enum CourseStatus {
+export enum CourseStatus {
   ENGLEARNER="bg-[rgb(237,206,204)]",
   SPECIALED="bg-[rgb(247,230,206)]",
   ALTERNATIVE="bg-[rgb(252,243,205)]",
@@ -628,27 +653,3 @@ enum CourseStatus {
   NONCREDIT="bg-[rgb(240,205,158)]",
   HONORS="text-pink-400 font-semibold",
 };
-
-const isMerging = (classes: TeacherClass[], period: number, thisClass: TeacherClass) => classes.some(c2 => c2.periods[period] > 0 && c2.code !== thisClass.code);
-const isLastClass = (classes: TeacherClass[], classPos: number, period: number) => classes.every((c2,k) => classPos >= k || c2.periods[period] === 0);
-
-function GetStatus(code: string, name: string) {
-  const modifiers = code.slice(-3);
-  const lowerName = name.toLowerCase();
-  if(code.startsWith("NEI") || modifiers.includes("J"))
-    return CourseStatus.ENGLEARNER;
-  else if(modifiers.includes("S"))
-    return CourseStatus.SPECIALED;
-  else if(modifiers.includes("U"))
-    return CourseStatus.ALTERNATIVE;
-  else if(code.startsWith("XAG") || code.startsWith("XW") || code.startsWith("XZ"))
-    return CourseStatus.NONCREDIT;
-  else if(/wo?r?k-?sho?p/i.test(name) || modifiers.includes("ALC") || modifiers.includes("CBI") || modifiers.includes("W") || modifiers.includes("R"))
-    return CourseStatus.WORKSHOP;
-  else if(modifiers.includes("V") && modifiers !== "AVD" && !code.endsWith("AVID"))
-    return CourseStatus.VIRTUAL;
-  else if(code.startsWith("NSA") || code.startsWith("NSC"))
-    return CourseStatus.ASSESSMENT;
-  else if(lowerName.startsWith("ap ") || lowerName.startsWith("advanced placement") || (modifiers.endsWith("H") && modifiers !== "HTH") || modifiers.endsWith("G"))
-    return CourseStatus.HONORS;
-}

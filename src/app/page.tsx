@@ -2,8 +2,10 @@
 
 import ReactDOMServer from "react-dom/server";
 import csv from "papaparse";
-import { CSSProperties, Dispatch, Fragment, PropsWithChildren, SetStateAction, useMemo, useState } from "react";
+import { CSSProperties, Fragment, useMemo, useState } from "react";
 import { FinalSample, QueryStudents, Student, StudentRosterEntry, Teacher, TeacherClass, TeacherScheduleEntry } from "@/lib/types";
+import { Button } from "@/components/Button";
+import { Textarea } from "../components/Textarea";
 
 const periodKeys: (keyof TeacherScheduleEntry)[] = [
   "Period 1", "Period 2", "Period 3", "Period 4", "Period 5", "Period 6", "Period 7", "Period 8", "Period 9", "Period 10", "Period 11", "Period 12", "Period 13", "Period 19", "Period 20"
@@ -649,21 +651,4 @@ function GetStatus(code: string, name: string) {
     return CourseStatus.ASSESSMENT;
   else if(lowerName.startsWith("ap ") || lowerName.startsWith("advanced placement") || (modifiers.endsWith("H") && modifiers !== "HTH") || modifiers.endsWith("G"))
     return CourseStatus.HONORS;
-}
-
-function Button(props: { onClick: () => void; className: string; } & React.PropsWithChildren) {
-  return <div className={props.className + ' text-center font-semibold rounded-xl px-3 py-1 my-3 text-black'} onClick={props.onClick}>
-    {props.children}
-  </div>;
-}
-
-function Textarea(props: { setter: Dispatch<SetStateAction<string | undefined>>} & PropsWithChildren) {
-  return <>
-    <p>{props.children}</p>
-    <textarea 
-      onChange={e => props.setter(e.target.value)} 
-      className="h-40 resize-none bg-gray-100 text-black w-full rounded-md px-2 py-1 shadow-inner shadow-black"
-      placeholder={"Paste " + ReactDOMServer.renderToString(props.children).toLowerCase() + " from Google sheets here"}
-    />
-  </>;
 }

@@ -1,9 +1,20 @@
-import { CourseStatus } from "@/app/page";
 import { TeacherClass } from "./types";
 
 export const splitInput = (string: string, separator: string) => string.split(separator).filter(s => s.length);
 export const isMerging = (classes: TeacherClass[], period: number, thisClass: TeacherClass) => classes.some(c2 => c2.periods[period] > 0 && c2.code !== thisClass.code);
 export const isLastClass = (classes: TeacherClass[], classPos: number, period: number) => classes.every((c2, k) => classPos >= k || c2.periods[period] === 0);
+
+export enum CourseStatus {
+  ENGLEARNER="bg-[rgb(237,206,204)]",
+  SPECIALED="bg-[rgb(247,230,206)]",
+  ALTERNATIVE="bg-[rgb(252,243,205)]",
+  WORKSHOP="bg-[rgb(220,233,211)]",
+  VIRTUAL="bg-[rgb(212,225,243)]",
+  ASSESSMENT="bg-[rgb(216,210,233)]",
+  NONCREDIT="bg-[rgb(240,205,158)]",
+  HONORS="text-pink-400 font-semibold",
+};
+
 export function GetStatus(code: string, name: string) {
   const modifiers = code.slice(-3);
   const lowerName = name.toLowerCase();

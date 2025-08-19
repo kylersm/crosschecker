@@ -6,7 +6,7 @@ import { CSSProperties, Fragment, useMemo, useState } from "react";
 import { FinalSample, QueryStudents, Student, StudentRosterEntry, Teacher, TeacherScheduleEntry } from "@/lib/types";
 import { Button } from "@/components/Button";
 import { Textarea } from "../components/Textarea";
-import { isMerging, GetStatus, isLastClass, splitInput } from "@/lib/util";
+import { isMerging, GetStatus, isLastClass, splitInput, CourseStatus } from "@/lib/util";
 
 const periodKeys: (keyof TeacherScheduleEntry)[] = [
   "Period 1", "Period 2", "Period 3", "Period 4", "Period 5", "Period 6", "Period 7", "Period 8", "Period 9", "Period 10", "Period 11", "Period 12", "Period 13", "Period 19", "Period 20"
@@ -642,14 +642,3 @@ export default function Home() {
     </div>
   );
 }
-
-export enum CourseStatus {
-  ENGLEARNER="bg-[rgb(237,206,204)]",
-  SPECIALED="bg-[rgb(247,230,206)]",
-  ALTERNATIVE="bg-[rgb(252,243,205)]",
-  WORKSHOP="bg-[rgb(220,233,211)]",
-  VIRTUAL="bg-[rgb(212,225,243)]",
-  ASSESSMENT="bg-[rgb(216,210,233)]",
-  NONCREDIT="bg-[rgb(240,205,158)]",
-  HONORS="text-pink-400 font-semibold",
-};

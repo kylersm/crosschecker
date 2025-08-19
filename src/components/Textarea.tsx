@@ -2,7 +2,7 @@
 import { Dispatch, SetStateAction, PropsWithChildren } from "react";
 import ReactDOMServer from "react-dom/server";
 
-export function Textarea(props: { setter: Dispatch<SetStateAction<string | undefined>>; } & PropsWithChildren) {
+export default function TextArea(props: { setter: Dispatch<SetStateAction<string | undefined>>; } & PropsWithChildren) {
   return <>
     <p>{props.children}</p>
     <textarea

@@ -4,8 +4,8 @@ import ReactDOMServer from "react-dom/server";
 import csv from "papaparse";
 import { CSSProperties, Fragment, useMemo, useState } from "react";
 import { FinalSample, QueryStudents, Student, StudentRosterEntry, Teacher, TeacherScheduleEntry } from "@/lib/types";
-import { Button } from "@/components/Button";
-import { Textarea } from "../components/Textarea";
+import Button from "@/components/Button";
+import TextArea from "@/components/TextArea";
 import { isMerging, GetStatus, isLastClass, splitInput, CourseStatus } from "@/lib/util";
 
 const periodKeys: (keyof TeacherScheduleEntry)[] = [
@@ -233,6 +233,7 @@ export default function Home() {
   }, [classCodeObj, teachersWithFilters, numsSplit]);
 
   const CopySampleButton = <Button onClick={() => {
+    // style prop has to be used instead of tailwind classes in order for styling to appear in Google Sheets
     const content = ReactDOMServer.renderToStaticMarkup(<table style={{ fontFamily: "Calibri", fontSize: "12pt" }}>
       <tbody>
         <tr style={{ fontFamily: "Times New Roman", fontWeight: "bold" }}>
@@ -261,7 +262,6 @@ export default function Home() {
     </table>);
     // copy WITH FORMATTING to clipboard with a lot of ease
     navigator.clipboard.write([new ClipboardItem({
-      // style prop has to be used instead of tailwind classes
       "text/html":  new Blob([content], { type: "text/html" })
     })])
   }} className="bg-amber-500">
@@ -348,19 +348,19 @@ export default function Home() {
 
   return (
     <div className="w-full h-screen">
-      <div className="mx-2 my-5 pb-10">
+      <div className="mx-2 my-5">
         {/* Paste-in fields (2) */}
         <p className="text-6xl font-bold text-center">Sampler Site</p>
         <div className="flex gap-x-10 mx-20 mb-10">
           <div className="w-1/2 text-center">
-            <Textarea setter={setTS}>
+            <TextArea setter={setTS}>
               Teacher Schedules
-            </Textarea>
+            </TextArea>
           </div>
           <div className="w-1/2 text-center">
-            <Textarea setter={setSR}>
+            <TextArea setter={setSR}>
               Student Rosters
-            </Textarea>
+            </TextArea>
           </div>
         </div>
 
@@ -384,25 +384,25 @@ export default function Home() {
                   <td><input onChange={e => setDAH(e.target.checked)} type="checkbox"/></td>
                 </tr>
                 <tr>
-                  <td>Course code ends with...</td>
+                  <td>and Course code ends with...</td>
                   <td><input onChange={e => setCCS(e.target.value)} type="text" className="bg-slate-200 dark:bg-white rounded-md text-black px-2"/></td>
                   <td>Select all classes (on screen) for sample</td>
                   <td><input onClick={() => {setIClass(allClasses);}} className="bg-slate-200 dark:bg-white text-black rounded-md px-2 border-black" type="button" value={"Click me!"}/></td>
                 </tr>
                 <tr>
-                  <td className="border-t-2">Course name contains...</td>
+                  <td className="border-t-2">OR Course name contains...</td>
                   <td className="border-t-2"><input onChange={e => setCNI(e.target.value)} type="text" className="bg-slate-200 dark:bg-white rounded-md text-black px-2"/></td>
                   <td>Unselect all classes for sample</td>
                   <td><input onClick={() => {setECourse([]);setIClass([]);}} className="bg-slate-200 dark:bg-white text-black rounded-md px-2 border-black" type="button" value={"Click me!"}/></td>
                 </tr>
                 <tr>
-                  <td>Period must be...</td>
+                  <td>and Period must be...</td>
                   <td><input onChange={e => setCPIS(e.target.value)} type="text" className="bg-slate-200 dark:bg-white rounded-md text-black px-2"/></td>
-                  <td>DOE Enrollment</td>
+                  <td>Enrollment</td>
                   <td><input onChange={e => setDEN(parseInt(e.target.value))} type="number" min={1} className="bg-slate-200 dark:bg-white rounded-md text-black px-2"/></td>
                 </tr>
                 <tr>
-                  <td>CDC Random Numbers</td>
+                  <td>Classes</td>
                   <td colSpan={3}><input onChange={e => setCDCN(e.target.value)} type="text" className="bg-slate-200 dark:bg-white w-full rounded-md text-black px-2"/></td>
                 </tr>
               </tbody>
@@ -546,16 +546,9 @@ export default function Home() {
                 {query ? <div>
                   <div className="text-center text-4xl font-semibold pb-2 sticky top-0 bg-background w-full" id="student-overview">
                     Student Overview
-                    <div className="mx-auto text-base font-normal">
-                      <b>Selected class{query.length > 1 ? 'es' : null}</b><br/>
-                      {query.map((q, i) => <Fragment key={'query'+i}>
-                        {i === 0 ? <>{q.teacher} PD {q.period}<br/></> : null}
-                        Course {q.code}<br/>
-                      </Fragment>)}
-                    </div>
                   </div>
                   <div>
-                    <table className="mx-auto mb-5 info w-full">
+                    <table className="mx-auto mb-[7rem] info w-full">
                       <thead className="sticky top-12">
                         <tr className="dark:bg-slate-500 bg-slate-100">
                           <th>SSID</th>
@@ -595,24 +588,35 @@ export default function Home() {
                     </table>
                   </div>
                   {/* STICKY BOTTOM */}
-                  <div className="sticky bottom-0 w-full bg-background shadow-black shadow-2xl py-2 px-2">
-                    <i>See student overview before clicking</i>
+                  <div className="fixed bottom-0 w-screen -ml-3 bg-background shadow-black shadow-[0px_0px_1rem] py-2 px-5">
                     <div className="flex gap-x-2">
-                      <Button onClick={() => {
-                        setIClass(includeClasses.filter(i => !query.map(q => q.code + discriminator + q.teacher + discriminator + q.period).includes(i)));
-                        goToSelected();
-                      }} className="bg-red-400">
-                        Exclude Class
-                      </Button>
-                      <Button onClick={() => {
-                        setIClass(includeClasses.concat(query.map(q => q.code + discriminator + q.teacher + discriminator + q.period)));
-                        goToSelected();
-                      }} className="bg-green-400">
-                        Include Class
-                      </Button>
+                      <div>
+                        <div className="flex gap-x-2">
+                          <Button onClick={() => {
+                            setIClass(includeClasses.filter(i => !query.map(q => q.code + discriminator + q.teacher + discriminator + q.period).includes(i)));
+                            goToSelected();
+                          }} className="bg-red-400">
+                            Exclude Class
+                          </Button>
+                          <Button onClick={() => {
+                            setIClass(includeClasses.concat(query.map(q => q.code + discriminator + q.teacher + discriminator + q.period)));
+                            goToSelected();
+                          }} className="bg-green-400">
+                            Include Class
+                          </Button>
+                        </div>
+                        <i>See student overview before clicking</i>
+                      </div>
                       <div className="border-r-2 mx-4"/>
                       {CopyTableButton}
                       {CopySampleButton}
+                      <div className="mx-auto text-base font-normal">
+                        <b>Selected class{query.length > 1 ? 'es' : null}</b><br/>
+                        {query.map((q, i) => <Fragment key={'query'+i}>
+                          {i === 0 ? <>{q.teacher} PD {q.period}<br/> Course{query.length > 1 ? 's' : ''} </> : ', '}
+                          {q.code}
+                        </Fragment>)}
+                      </div>
                     </div>
                   </div>
                 </div> : null}

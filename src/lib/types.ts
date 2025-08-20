@@ -1,9 +1,4 @@
-export interface TeacherScheduleEntry {
-  School: string;
-  Schoolname: string;
-  "Course Code": string;
-  "Course Name": string;
-  Teacher: string;
+export interface Periods {
   "Period 1": string;
   "Period 2": string;
   "Period 3": string;
@@ -19,13 +14,25 @@ export interface TeacherScheduleEntry {
   "Period 13": string;
   "Period 19": string;
   "Period 20": string;
+}
+export interface CSVTeacherScheduleEntry extends Periods {
+  School: string;
+  Schoolname: string;
+  "Course Code": string;
+  "Course Name": string;
+  Teacher: string;
   "Grand Total": string;
 }
 
 export interface TeacherClass {
-  name: string;
-  code: string;
-  periods: number[];
+  courseCode: string;
+  courseName: string;
+}
+
+export interface ClassPeriod extends TeacherClass {
+  teacher: string;
+  periodNumber: keyof Periods;
+  enrollment: number;
 }
 
 export interface Teacher {
@@ -53,7 +60,7 @@ export interface QueryStudents {
   period: string;
 }
 
-export interface StudentRosterEntry {
+export interface CSVStudentRosterEntry {
   stateID: string;
   Student: string;
   School: string;

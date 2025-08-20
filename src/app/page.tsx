@@ -3,14 +3,10 @@
 import ReactDOMServer from "react-dom/server";
 import csv from "papaparse";
 import { CSSProperties, Fragment, useMemo, useState } from "react";
-import { FinalSample, QueryStudents, Student, StudentRosterEntry, Teacher, TeacherScheduleEntry } from "@/lib/types";
+import { FinalSample, QueryStudents, Student, CSVStudentRosterEntry, CSVTeacherScheduleEntry, ClassPeriod } from "@/lib/types";
 import Button from "@/components/Button";
 import TextArea from "@/components/TextArea";
-import { isMerging, GetStatus, isLastClass, splitInput, CourseStatus } from "@/lib/util";
-
-const periodKeys: (keyof TeacherScheduleEntry)[] = [
-  "Period 1", "Period 2", "Period 3", "Period 4", "Period 5", "Period 6", "Period 7", "Period 8", "Period 9", "Period 10", "Period 11", "Period 12", "Period 13", "Period 19", "Period 20"
-];
+import { isMerging, getStatus, isLastClass, splitInput, CourseStatus, periodKeys, getPeriodIndex } from "@/lib/util";
 
 const discriminator = 'あ';
 
@@ -19,12 +15,12 @@ export default function Home() {
   const [stdtnRost, setSR] = useState<string>();
 
   // parse input in textareas
-  const parsedTS = teacherSched ? csv.parse<TeacherScheduleEntry>(teacherSched, {
+  const parsedTS = teacherSched ? csv.parse<CSVTeacherScheduleEntry>(teacherSched, {
     delimiter: '\t',
     header: true
   }) : void 0;
 
-  const parsedSR = stdtnRost ? csv.parse<StudentRosterEntry>(stdtnRost, {
+  const parsedSR = stdtnRost ? csv.parse<CSVStudentRosterEntry>(stdtnRost, {
     delimiter: '\t',
     header: true
   }) : void 0;
@@ -43,22 +39,22 @@ export default function Home() {
   }, [parsedTS, parsedSR]);
 
   // go through parsed teacher TSV
-  const teachers: Teacher[] = [];
+  const classPeriods: ClassPeriod[] = [];
   if(parsedTS && !parseErrors.length) {
-    // sort alphabetically
-    for(const clazz of parsedTS.data.sort((a, b) => a.Teacher.localeCompare(b.Teacher))) {
-      // find teacher entry, or create one if it doesn't exist & add it to teachers list
-      let entry = teachers.find(t => t.name === clazz.Teacher);
-      if(!entry) {
-        entry = { name: clazz.Teacher, classes: [] };
-        teachers.push(entry);
-      }
+    // sort teachers by last name, A -> Z
+    for(const clazz of parsedTS.data.sort((a, b) => a.Teacher.localeCompare(b.Teacher) + a["Course Code"].localeCompare(b["Course Code"]))) {
       // add the class to teacher's classes
-      entry.classes.push({
-        code: clazz["Course Code"],
-        name: clazz["Course Name"],
-        periods: periodKeys.map(p => parseInt(clazz[p]))
-      });
+      for(const period of periodKeys) {
+        const enrollment = parseInt(clazz[period]);
+        if(enrollment <= 0) continue;
+        classPeriods.push({
+          courseCode: clazz["Course Code"],
+          courseName: clazz["Course Name"],
+          teacher: clazz.Teacher,
+          periodNumber: period,
+          enrollment
+        });
+      }
     }
   }
 
@@ -81,7 +77,7 @@ export default function Home() {
   const suffixes = splitInput(ccSuf, inputSeparator);
   const includes = splitInput(cnInc, inputSeparator);
   const periods  = splitInput(cPIs, inputSeparator)
-                    .map(k => periodKeys.indexOf(("Period " + k) as keyof TeacherScheduleEntry))
+                    .map(k => getPeriodIndex(k))
                     .filter(k => k > -1);
 
   const teachersWithFilters = teachers
@@ -134,7 +130,7 @@ export default function Home() {
         name: student["Course Name"],
         teacher: student.Teacher,
         period: parseInt(student.Period),
-        enrollment: teachers.find(t => t.name === student.Teacher)?.classes.find(c => c.code === student["Course Code"])?.periods[periodKeys.indexOf(("Period " + student.Period) as keyof TeacherScheduleEntry)] ?? -1
+        enrollment: teachers.find(t => t.name === student.Teacher)?.classes.find(c => c.code === student["Course Code"])?.periods[periodKeys.indexOf(("Period " + student.Period) as keyof CSVTeacherScheduleEntry)] ?? -1
       });
     }
     // then sort each student's roster by period (for housekeeping)
@@ -210,7 +206,7 @@ export default function Home() {
       const teacher = destructKey[1].split(', ') as [string, string];
       const period = destructKey[2];
       const classEntry = teachersWithFilters.find(t => t.name === destructKey[1])?.classes.find(c => c.code === courseCode);
-      const periodIndex = periodKeys.indexOf(("Period " + period) as keyof TeacherScheduleEntry);
+      const periodIndex = periodKeys.indexOf(("Period " + period) as keyof CSVTeacherScheduleEntry);
 
       return {
         T_L_Name: teacher[0],
@@ -431,7 +427,7 @@ export default function Home() {
                   <tbody className="border-2">
                     {/* Add a row for each teacher and their class(es) */}
                     {teachersWithFilters.map(t => t.classes.map((c, i, classes) => {
-                      const status = GetStatus(c.code, c.name);
+                      const status = getStatus(c.code, c.name);
                       const thisCourse = c.code+discriminator+t.name;
                       const excludedClasses = excludeCourses.includes(thisCourse) ? 'italic line-through text-gray-400' : '';
                       const rowSpan = periodSchool || excludedClasses.length ? 1 : 2;
@@ -563,7 +559,7 @@ export default function Home() {
                       <tbody>
                         {students.map(s => s.schedule.map((c, i) => {
                         const isThisClass = query?.some(q => q.code === c.code && q.period === c.period.toString() && q.teacher === c.teacher);
-                        const status = isThisClass ? 'bg-amber-300' : GetStatus(c.code, c.name);
+                        const status = isThisClass ? 'bg-amber-300' : getStatus(c.code, c.name);
                         const appearsInOther = !disableApHighlight && !periods.length && teachersWithFilters.some(t => 
                           t.classes.some(c2 => 
                             // c2.code !== query.code && t.name !== query.teacher &&

@@ -3,13 +3,15 @@
 import ReactDOMServer from "react-dom/server";
 import csv from "papaparse";
 import { CSSProperties, Fragment, useMemo, useState } from "react";
-import { FinalSample, QueryStudents, Student, StudentRosterEntry, Teacher, TeacherScheduleEntry } from "@/lib/types";
+import { FinalSample, Period, QueryStudents, Student, StudentRosterEntry, Teacher, TeacherScheduleEntry } from "@/lib/types";
 import { Button } from "@/components/Button";
-import { Textarea } from "../components/Textarea";
+import { Textarea } from "@/components/Textarea";
 import { isMerging, GetStatus, isLastClass, splitInput, CourseStatus } from "@/lib/util";
 
-const periodKeys: (keyof TeacherScheduleEntry)[] = [
-  "Period 1", "Period 2", "Period 3", "Period 4", "Period 5", "Period 6", "Period 7", "Period 8", "Period 9", "Period 10", "Period 11", "Period 12", "Period 13", "Period 19", "Period 20"
+const periodKeys: Period[] = [
+  "Period 1",  "Period 2",  "Period 3",  "Period 4",  "Period 5", 
+  "Period 6",  "Period 7",  "Period 8",  "Period 9",  "Period 10", 
+  "Period 11", "Period 12", "Period 13", "Period 19", "Period 20"
 ];
 
 const discriminator = 'あ';
@@ -81,7 +83,7 @@ export default function Home() {
   const suffixes = splitInput(ccSuf, inputSeparator);
   const includes = splitInput(cnInc, inputSeparator);
   const periods  = splitInput(cPIs, inputSeparator)
-                    .map(k => periodKeys.indexOf(("Period " + k) as keyof TeacherScheduleEntry))
+                    .map(k => periodKeys.indexOf(("Period " + k) as Period))
                     .filter(k => k > -1);
 
   const teachersWithFilters = teachers
@@ -134,7 +136,7 @@ export default function Home() {
         name: student["Course Name"],
         teacher: student.Teacher,
         period: parseInt(student.Period),
-        enrollment: teachers.find(t => t.name === student.Teacher)?.classes.find(c => c.code === student["Course Code"])?.periods[periodKeys.indexOf(("Period " + student.Period) as keyof TeacherScheduleEntry)] ?? -1
+        enrollment: teachers.find(t => t.name === student.Teacher)?.classes.find(c => c.code === student["Course Code"])?.periods[periodKeys.indexOf(("Period " + student.Period) as Period)] ?? -1
       });
     }
     // then sort each student's roster by period (for housekeeping)
@@ -210,7 +212,7 @@ export default function Home() {
       const teacher = destructKey[1].split(', ') as [string, string];
       const period = destructKey[2];
       const classEntry = teachersWithFilters.find(t => t.name === destructKey[1])?.classes.find(c => c.code === courseCode);
-      const periodIndex = periodKeys.indexOf(("Period " + period) as keyof TeacherScheduleEntry);
+      const periodIndex = periodKeys.indexOf(("Period " + period) as Period);
 
       return {
         T_L_Name: teacher[0],
@@ -549,7 +551,7 @@ export default function Home() {
                     <div className="mx-auto text-base font-normal">
                       <b>Selected class{query.length > 1 ? 'es' : null}</b><br/>
                       {query.map((q, i) => <Fragment key={'query'+i}>
-                        {i === 0 ? <>{q.teacher} PD {q.period}<br/></> : null}
+                        {i === 0 ? <>{q.teacher} {q.period}<br/></> : null}
                         Course {q.code}<br/>
                       </Fragment>)}
                     </div>
@@ -602,13 +604,46 @@ export default function Home() {
                         setIClass(includeClasses.filter(i => !query.map(q => q.code + discriminator + q.teacher + discriminator + q.period).includes(i)));
                         goToSelected();
                       }} className="bg-red-400">
-                        Exclude Class
+                         Exclude Class
                       </Button>
                       <Button onClick={() => {
                         setIClass(includeClasses.concat(query.map(q => q.code + discriminator + q.teacher + discriminator + q.period)));
                         goToSelected();
                       }} className="bg-green-400">
                         Include Class
+                      </Button>
+                      <Button onClick={() => {
+                        if(query[0]) {
+                          let teacherIndex = teachersWithFilters.findIndex(t => t.name === query[0].teacher);
+                          let classIndex = teachersWithFilters[teacherIndex].classes.findIndex(c => c.code === query[0].code);
+                          let periodIndex = periodKeys.indexOf("Period " + query[0].period as Period);
+
+                          while(true) {
+                            if(periodIndex + 1 >= periodKeys.length) {
+                              periodIndex = 0;
+                              if(classIndex + 1 >= teachersWithFilters[teacherIndex].classes.length) {
+                                classIndex = 0;
+                                if(teacherIndex + 1 >= teachersWithFilters.length) {
+                                  alert("at end of list");
+                                  break;
+                                } else teacherIndex++;
+                              } else classIndex++;
+                            } else periodIndex++;
+
+                            const teacher = teachersWithFilters[teacherIndex];
+                            const enrollment = teacher.classes[classIndex].periods[periodIndex];
+                            if(enrollment > 0 && teacher.classes.every((c, i) => classIndex <= i || c.periods[periodIndex] === 0 || excludeCourses.includes(c.code + discriminator + teacher.name))) {
+                              setQuery(teacher.classes.filter(t => t.periods[periodIndex] > 0).map(c => ({
+                                code: c.code,
+                                period: periodKeys[periodIndex].slice("Period ".length),
+                                teacher: teacher.name
+                              })));
+                              break;
+                            }
+                          }
+                        }
+                      }} className="bg-blue-400">
+                        Next Class
                       </Button>
                       <div className="border-r-2 mx-4"/>
                       {CopyTableButton}

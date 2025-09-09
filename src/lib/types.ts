@@ -22,6 +22,22 @@ export interface TeacherScheduleEntry {
   "Grand Total": string;
 }
 
+export type Period = keyof TeacherScheduleEntry & ("Period 1" |
+"Period 2" |
+"Period 3" |
+"Period 4" |
+"Period 5" |
+"Period 6" |
+"Period 7" |
+"Period 8" |
+"Period 9" |
+"Period 10" |
+"Period 11" |
+"Period 12" |
+"Period 13" |
+"Period 19" |
+"Period 20");
+
 export interface TeacherClass {
   name: string;
   code: string;
@@ -47,10 +63,24 @@ interface StudentClass {
   enrollment: number;
 }
 
-export interface QueryStudents {
+/* new types? */
+
+/* new type end */
+export interface ExcludeStudents {
   code: string;
   teacher: string;
+}
+
+export interface QueryStudents extends ExcludeStudents {
   period: string;
+}
+
+export function compareExclude(a: ExcludeStudents, b: ExcludeStudents) {
+  return a.code === b.code && a.teacher === b.teacher;
+}
+
+export function compareQuery(a: QueryStudents, b: QueryStudents) {
+  return compareExclude(a, b) && a.period === b.period;
 }
 
 export interface StudentRosterEntry {

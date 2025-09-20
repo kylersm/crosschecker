@@ -38,6 +38,14 @@ export type Period = keyof TeacherScheduleEntry & ("Period 1" |
 "Period 19" |
 "Period 20");
 
+export const periodKeys: Period[] = [
+  "Period 1",  "Period 2",  "Period 3",  "Period 4",  "Period 5", 
+  "Period 6",  "Period 7",  "Period 8",  "Period 9",  "Period 10", 
+  "Period 11", "Period 12", "Period 13", "Period 19", "Period 20"
+];
+
+export const discriminator = 'あ';
+
 export interface TeacherClass {
   name: string;
   code: string;

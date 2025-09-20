@@ -1,20 +1,12 @@
 "use client";
 
-import ReactDOMServer from "react-dom/server";
 import csv from "papaparse";
-import { CSSProperties, Fragment, useMemo, useState } from "react";
-import { FinalSample, Period, QueryStudents, Student, StudentRosterEntry, Teacher, TeacherScheduleEntry } from "@/lib/types";
-import { Button } from "@/components/Button";
+import { Fragment, useMemo, useState } from "react";
+import { discriminator, Period, periodKeys, QueryStudents, Student, StudentRosterEntry, Teacher, TeacherScheduleEntry } from "@/lib/types";
 import { Textarea } from "@/components/Textarea";
-import { isMerging, GetStatus, isLastClass, splitInput, CourseStatus } from "@/lib/util";
-
-const periodKeys: Period[] = [
-  "Period 1",  "Period 2",  "Period 3",  "Period 4",  "Period 5", 
-  "Period 6",  "Period 7",  "Period 8",  "Period 9",  "Period 10", 
-  "Period 11", "Period 12", "Period 13", "Period 19", "Period 20"
-];
-
-const discriminator = 'あ';
+import { isMerging, GetStatus, isLastClass, splitInput } from "@/lib/util";
+import ColorCodes from "@/components/ColorCodes";
+import BottomBar from "@/components/BottomBar";
 
 export default function Home() {
   const [teacherSched, setTS] = useState<string>();
@@ -35,8 +27,11 @@ export default function Home() {
   const parseErrors = useMemo<string[]>(() => {
     const errors = [];
     // make sure they didn't paste it in the wrong area
+    
     if(Object.keys(parsedTS?.data[0] ?? {}).length === 11 || Object.keys(parsedSR?.data[0] ?? {}).length === 21)
-      errors.push("You pasted the teacher schedules and student rosters in the wrong areas (swap them)");
+      errors.push("You pasted the teacher schedules and student rosters in the wrong areas");
+    if(parsedTS?.data[0] && Object.keys(parsedTS.data[0]).length !== 21 ||parsedSR?.data[0] &&  Object.keys(parsedSR.data[0]).length !== 11)
+      errors.push("Teacher or student roster has an invalid amount of columns.");
     if(parsedTS?.errors.length)
       errors.push(...parsedTS.errors.map(e => `Teacher Schedule:\t${e.type} (${e.code}): ${e.message} @ ${e.index ? 'Index ' + e.index : ''} ${e.row ? 'Row ' + e.row : ''}`));
     if(parsedSR?.errors.length)
@@ -86,7 +81,7 @@ export default function Home() {
                     .map(k => periodKeys.indexOf(("Period " + k) as Period))
                     .filter(k => k > -1);
 
-  const teachersWithFilters = teachers
+  const teachersWithFilters:Teacher[] = teachers
     // first filter teacher classes that begin and end with given phrases, OR include if name includes phrase and (if period school), period matches input
     .map(t => ({ ...t, classes: t.classes.filter(c => {
       if(prefixes.length || suffixes.length || includes.length || periods.length) {
@@ -203,151 +198,6 @@ export default function Home() {
     return o;
   }, [excludeCourses, includeClasses, teachersWithFilters]);
 
-  // generate the text to be pasted into the spreadsheet
-  const unparse = useMemo<FinalSample[]>(() => {
-    const arr: FinalSample[] = Object.entries(classCodeObj).filter(([, code]) => numsSplit.includes(code)).map(([key, code]) => {
-      // get information from the key
-      const destructKey = key.split(discriminator) as [string, string, string];
-      const courseCode = destructKey[0];
-      const teacher = destructKey[1].split(', ') as [string, string];
-      const period = destructKey[2];
-      const classEntry = teachersWithFilters.find(t => t.name === destructKey[1])?.classes.find(c => c.code === courseCode);
-      const periodIndex = periodKeys.indexOf(("Period " + period) as Period);
-
-      return {
-        T_L_Name: teacher[0],
-        T_F_Name: teacher[1],
-        Period: period,
-        Enrollment: classEntry?.periods[periodIndex].toString() ?? '-1',
-        ClassCode: code.toString(),
-        CourseName: classEntry?.name ?? "Not found"
-      }
-    }).sort((a, b) => a.T_L_Name.localeCompare(b.T_L_Name));
-
-    return arr.concat(...new Array(Math.max(0, 15 - arr.length)).fill({
-      T_L_Name: '',
-      T_F_Name: '',
-      Period: '',
-      Enrollment: '',
-      ClassCode: '',
-      CourseName: ''
-    }));
-  }, [classCodeObj, teachersWithFilters, numsSplit]);
-
-  const CopySampleButton = <Button onClick={() => {
-    const content = ReactDOMServer.renderToStaticMarkup(<table style={{ fontFamily: "Calibri", fontSize: "12pt" }}>
-      <tbody>
-        <tr style={{ fontFamily: "Times New Roman", fontWeight: "bold" }}>
-          <td>T_L_Name</td>
-          <td>T_F_Name</td>
-          <td style={{ color: "#f00" }}>Period #</td>
-          <td>Enrollment</td>
-          <td>Class Code</td>
-          <td>Class</td>
-        </tr>
-        {unparse.map((row, i) => <tr key={i}>
-          <td>{row.T_L_Name}</td>
-          <td>{row.T_F_Name}</td>
-          <td>{row.Period}</td>
-          <td>{row.Enrollment}</td>
-          <td>{row.ClassCode}</td>
-          <td>{row.CourseName}</td>
-          {
-            i === 0 ?  <><td/><td/><td/><td/><td/><td style={{ fontFamily: "Times New Roman", fontWeight: "bold", color: "#f00" }}>Do not edit the Class</td></> :
-            i === 1 ?  <><td/><td/><td/><td/><td/><td>Look on the school page, if you think the report page is truncated.</td></> :
-            i === 13 ? <><td/><td/><td/><td style={{ fontFamily: "Times New Roman "}}>{unparse.reduce((p, c) => p + (parseInt(c.Enrollment) || 0), 0)}</td><td style={{ fontFamily: "Times New Roman "}}>enrollment</td></> :
-            i === 14 ? <><td/><td/><td/><td>{Math.max(...Object.values(classCodeObj))}</td><td># of classes</td></> : null
-          }
-        </tr>)}
-      </tbody>
-    </table>);
-    // copy WITH FORMATTING to clipboard with a lot of ease
-    navigator.clipboard.write([new ClipboardItem({
-      // style prop has to be used instead of tailwind classes
-      "text/html":  new Blob([content], { type: "text/html" })
-    })])
-  }} className="bg-amber-500">
-    Copy sample
-  </Button>;
-
-  // generate the table for sampling to be pasted into the spreadsheet
-  const excludedStyle: CSSProperties = { backgroundColor: "#ffff00" };
-  const CopyTableButton = <Button onClick={() => {
-    const content = ReactDOMServer.renderToStaticMarkup(<table style={{ fontFamily: "Calibri", fontSize: "12pt" }}>
-      <thead>
-        <th>Course Code</th>
-        <th>Course Name</th>
-        <th>Teacher</th>
-        {periodKeys.filter(x => !unusedPeriods.includes(x)).map(x => <th key={"cpyto"+x}>{x}</th>)}
-      </thead>
-      <tbody>
-        {teachersWithFilters.map(t => t.classes.map((c, i, classes) => {
-          const thisCourse = c.code+discriminator+t.name;
-          const isExcluded = excludeCourses.includes(thisCourse);
-          const style = { ...(isExcluded ? excludedStyle : undefined) };
-          const codeElement = c.periods.map((p,i) => {
-            const includePeriod = includeClasses.includes(c.code + discriminator + t.name + discriminator + (periodKeys[i].slice("Period ".length)));
-            const doNotInclude = p === 0 || !includePeriod;
-            const num = classCodeObj[c.code + discriminator + t.name + discriminator + periodKeys[i].slice("Period ".length)] ?? -1;
-            const selected = !doNotInclude && numsSplit.includes(num);
-            const isMergingClass = isMerging(classes, i, c);
-            if(!unusedPeriods.includes(periodKeys[i])) return num > 0 ? <td 
-              key={"copyclasstable" + c.code + '-' + t.name + '-' + periodKeys[i]}
-              style={{ ...style, color: "#f00", backgroundColor: selected ? 'rgb(217, 234, 211)' : isMergingClass ? 'rgb(252, 229, 205)' : ''}}
-            >
-              {num}
-            </td> : null;
-          });
-          return <Fragment key={"copyteachertable" + c.code + '-' + t.name}>
-            <tr>
-              { /* add teacher name row only for first row since we do a row span */ }
-              <td style={style}>{c.code}</td>
-              <td style={style}>{c.name}</td>
-              <td style={style}>{t.name}</td>
-              {c.periods.map((p,j) => {
-                const isMergingClass = classes.filter(c2 => c2.periods[j] > 0).length > 1;
-                const includePeriod = includeClasses.includes(c.code + discriminator + t.name + discriminator + (periodKeys[j].slice("Period ".length)));
-                const num = classCodeObj[c.code + discriminator + t.name + discriminator + periodKeys[j].slice("Period ".length)] ?? -1;
-                const doNotInclude = p === 0 || !includePeriod;
-                const selected = !doNotInclude && numsSplit.includes(num);
-                return unusedPeriods.includes(periodKeys[j]) ? null : <td
-                  key={t.name + '-' + c.code + '-' + j}
-                  rowSpan={isExcluded || periodSchool ? 1 : p === 0 || num < 0 ? 2 : 1}
-                  style={{ ...style, backgroundColor: (
-                    (!isExcluded && isMergingClass) ? 'rgb(252, 229, 205)' :
-                    p > 0 ? selected ? 'rgb(217, 234, 211)' : (num < 0 ? excludedStyle.backgroundColor : style.backgroundColor) : style.backgroundColor
-                  ) }}
-                >
-                  {p === 0 ? '' : <div className="flex w-full gap-x-1">
-                    <span>{p}</span>
-                  </div>}
-                </td>;
-              })}
-              {periodSchool ? codeElement : null}
-            </tr>
-
-            {/* show class code number if selected */}
-            {!periodSchool && !isExcluded ? <tr>
-              <td/><td/><td/>
-              {codeElement}
-            </tr> : null}
-          </Fragment>
-        }))}
-      </tbody>
-    </table>);
-    navigator.clipboard.write([new ClipboardItem({
-      // style prop has to be used instead of tailwind classes
-      "text/html": new Blob([content], { type: "text/html" })
-    })])
-  }} className="bg-amber-400">
-    Copy table
-  </Button>;
-
-  const goToSelected = () => {
-    const y = (document.getElementById("queried")?.getBoundingClientRect().top ?? 0) + window.scrollY - 35;
-    window.scrollTo({ top: y, behavior: "smooth"});
-  };
-
   return (
     <div className="w-full h-screen">
       <div className="mx-2 my-5 pb-10">
@@ -414,7 +264,7 @@ export default function Home() {
               <b>RANGE: </b> {((filteredEnrollment / doeEn) * 100).toPrecision(3)}%<br/>
               {Math.abs(1 - (filteredEnrollment / doeEn)) > 0.10 ? <p className="text-red-500 font-bold">Out of 10% range</p> : <p className="text-green-500 font-bold text-lg">In 10% range</p>}
             </div>
-            <div className="flex gap-x-5 px-1">
+            <div className="flex gap-x-5 px-1 -mb-10">
               {/* LEFT SIDE */}
               <div className="w-full">
                 {/* TEACHER OVERVIEW */}
@@ -516,7 +366,7 @@ export default function Home() {
                                     period: periodKeys[j].slice("Period ".length),
                                     teacher: t.name
                                   })));
-                                }}>{p}</span> {(0 < p && p < 10) && <span className="bg-yellow-300 text-red-500">{'☹'}</span>}<input 
+                                }}>{p}</span> {(0 < p && p < 10) && <span className="bg-yellow-300 text-red-500" title="Enrollment <10">{'☹'}</span>}<input 
                                 className={`${isMergingClass && !isLast ? 'hidden' : ''} ml-auto accent-green-400`}
                                 type="checkbox" 
                                 // disable IF whole course was excluded (tickbox checked)
@@ -546,7 +396,7 @@ export default function Home() {
                 </table>
                 {/* STUDENT OVERVIEW */}
                 {query ? <div>
-                  <div className="text-center text-4xl font-semibold pb-2 sticky top-0 bg-background w-full" id="student-overview">
+                  <div className="text-center text-4xl font-semibold bg-background w-full" id="student-overview">
                     Student Overview
                     <div className="mx-auto text-base font-normal">
                       <b>Selected class{query.length > 1 ? 'es' : null}</b><br/>
@@ -558,7 +408,7 @@ export default function Home() {
                   </div>
                   <div>
                     <table className="mx-auto mb-5 info w-full">
-                      <thead className="sticky top-12">
+                      <thead className="sticky top-0">
                         <tr className="dark:bg-slate-500 bg-slate-100">
                           <th>SSID</th>
                           <th>Student</th>
@@ -596,78 +446,19 @@ export default function Home() {
                       </tbody>
                     </table>
                   </div>
-                  {/* STICKY BOTTOM */}
-                  <div className="sticky bottom-0 w-full bg-background shadow-black shadow-2xl py-2 px-2">
-                    <i>See student overview before clicking</i>
-                    <div className="flex gap-x-2">
-                      <Button onClick={() => {
-                        setIClass(includeClasses.filter(i => !query.map(q => q.code + discriminator + q.teacher + discriminator + q.period).includes(i)));
-                        goToSelected();
-                      }} className="bg-red-400">
-                         Exclude Class
-                      </Button>
-                      <Button onClick={() => {
-                        setIClass(includeClasses.concat(query.map(q => q.code + discriminator + q.teacher + discriminator + q.period)));
-                        goToSelected();
-                      }} className="bg-green-400">
-                        Include Class
-                      </Button>
-                      <Button onClick={() => {
-                        if(query[0]) {
-                          let teacherIndex = teachersWithFilters.findIndex(t => t.name === query[0].teacher);
-                          let classIndex = teachersWithFilters[teacherIndex].classes.findIndex(c => c.code === query[0].code);
-                          let periodIndex = periodKeys.indexOf("Period " + query[0].period as Period);
-
-                          while(true) {
-                            if(periodIndex + 1 >= periodKeys.length) {
-                              periodIndex = 0;
-                              if(classIndex + 1 >= teachersWithFilters[teacherIndex].classes.length) {
-                                classIndex = 0;
-                                if(teacherIndex + 1 >= teachersWithFilters.length) {
-                                  alert("at end of list");
-                                  break;
-                                } else teacherIndex++;
-                              } else classIndex++;
-                            } else periodIndex++;
-
-                            const teacher = teachersWithFilters[teacherIndex];
-                            const enrollment = teacher.classes[classIndex].periods[periodIndex];
-                            if(enrollment > 0 && teacher.classes.every((c, i) => classIndex <= i || c.periods[periodIndex] === 0 || excludeCourses.includes(c.code + discriminator + teacher.name))) {
-                              setQuery(teacher.classes.filter(t => t.periods[periodIndex] > 0).map(c => ({
-                                code: c.code,
-                                period: periodKeys[periodIndex].slice("Period ".length),
-                                teacher: teacher.name
-                              })));
-                              break;
-                            }
-                          }
-                        }
-                      }} className="bg-blue-400">
-                        Next Class
-                      </Button>
-                      <div className="border-r-2 mx-4"/>
-                      {CopyTableButton}
-                      {CopySampleButton}
-                    </div>
-                  </div>
                 </div> : null}
+                {/* STICKY BOTTOM */}
+                {query ? <BottomBar periodSchool={periodSchool}
+                    excludeCourses={excludeCourses}
+                    unusedPeriods={unusedPeriods}
+                    numsSplit={numsSplit}
+                    classCodeObj={classCodeObj}
+                    teachersWithFilters={teachersWithFilters}
+                    include={[includeClasses, setIClass]}
+                    query={[query, setQuery]}/> : null}
               </div>
               {/* RIGHT SIDE */}
-              <div className="w-fit max-w-[10rem] sticky top-0 self-start h-screen overflow-y-scroll">
-                <table className="mx-auto mb-5 info text-sm mt-1">
-                  <tbody>
-                    <tr><td>Regular class</td></tr>
-                    <tr><td className={CourseStatus.HONORS}>Honors / AP</td></tr>
-                    <tr><td className={CourseStatus.SPECIALED + " text-black"}>Special Education</td></tr>
-                    <tr><td className={CourseStatus.ENGLEARNER + " text-black"}>English Language Learner</td></tr>
-                    <tr><td className={CourseStatus.ALTERNATIVE + " text-black"}>Alternative</td></tr>
-                    <tr><td className={CourseStatus.WORKSHOP + " text-black"}>Workshop</td></tr>
-                    <tr><td className={CourseStatus.VIRTUAL + " text-black"}>Virtual</td></tr>
-                    <tr><td className={CourseStatus.ASSESSMENT + " text-black"}>CC Alt Assessment</td></tr>
-                    <tr><td className={CourseStatus.NONCREDIT + " text-black"}>Noncredit</td></tr>
-                  </tbody>
-                </table>
-              </div>
+              <ColorCodes/>
             </div>
           </div>
         </div> : null}
